@@ -77,7 +77,7 @@ test_suite_t test_suite;
 void write_report(const test_suite_t * suite) {
     FILE * f = fopen("report.xml", "w");
     fprintf(f,
-"<testsuite name=\"%s\" tests=\"%zu\">\n\
+"<testsuite name=\"%s\">\n\
     <testcase classname=\"a\" name=\"ASuccessfulTest\"/>\n\
     <testcase classname=\"b\" name=\"AnotherSuccessfulTest\"/>\n\
     <testcase name=\"fail\">\n\
