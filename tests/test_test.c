@@ -25,20 +25,6 @@ test_suite_t test_suite;
 test_case_t test_case;
 test_assertion_t test_assertion;
 
-void write_report(const test_suite_t * suite) {
-    FILE * f = fopen("report.xml", "w");
-    fprintf(f,
-"<testsuite name=\"%s\">\n\
-    <testcase id=\"a\" name=\"ASuccessfulTest\"/>\n\
-    <testcase id=\"b\" name=\"AnotherSuccessfulTest\"/>\n\
-    <testcase id=\"fail\">\n\
-        <failure type=\"ASSERT_EQ\">/Users/Maximilian/Desktop/🗿 static/tests/test_test.c:57: 1 == 2</failure>\n\
-    </testcase>\n\
-</testsuite>"\
-    , suite->name);
-    fclose(f);
-}
-
 void report_test_suite_open() {
     test_suite.file = fopen("report.xml", "w");
     fprintf(test_suite.file, "<testsuite name=\"%s\">\n", test_suite.name);
