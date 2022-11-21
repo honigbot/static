@@ -1,4 +1,5 @@
 #define STATIC_TEST_REPORT "report.xml"
+#define STATIC_TEST_PRINT stderr
 #include "static/test.h"
 
 void success() {
