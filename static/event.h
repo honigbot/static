@@ -45,7 +45,6 @@ void static_event_detach(static_callback_t * callback) {
         return;
     }
 
-    
     if(previous == 0 && next != 0) {
         // 'callback' was a head, make 'next' the new head
         next->previous = 0;
@@ -53,7 +52,6 @@ void static_event_detach(static_callback_t * callback) {
         return;
     }
 
-    
     if(previous != 0 && next == 0) {
         // 'callback' was a tail, make 'previous' the new tail
         previous->next = 0;
