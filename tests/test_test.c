@@ -48,7 +48,7 @@ void static_test_suite(const char * name, void (*function)()) {
 void static_test_failure() {
     fprintf(stderr, "\033[1;31m⛔ FAILED %s():\033[0m %s:%d: \n    %s\n", test_case.name, test_assertion.file, test_assertion.line, test_assertion.expression);
     fprintf(test_suite.file, 
-    "    <testcase name=\"%s()\"/>\n"
+    "    <testcase name=\"%s()\">\n"
     "        <failure type=\"%s\">%s:%d:    %s</failure>\n"
     "    </testcase>\n",
         test_case.name, test_assertion.name, test_assertion.file, test_assertion.line, test_assertion.expression);
@@ -56,13 +56,15 @@ void static_test_failure() {
 
 void static_test_success() {
     fprintf(stderr, "\033[1;32m✅ PASSED %s()\033[0m\n", test_case.name);
-    fprintf(test_suite.file, "    <testcase name=\"%s()\"/>\n", test_case.name);
+    fprintf(test_suite.file, "    <testcase name=\"%s()\"></testcase>\n", test_case.name);
 }
 
 void static_test(const char * name, void (*function)()) {
     test_case.name = name;
     test_case.result = 0;
     test_suite.tests += 1;
+    test_assertion.file = NULL;
+    
     fprintf(stderr, "\033[1m⬜ EXECUTING %s()\033[0m\n", test_case.name );
 	function();
 	if(test_assertion.file == NULL) {
