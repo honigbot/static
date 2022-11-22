@@ -1,8 +1,9 @@
 #ifndef STATIC_TEST_H
 #define STATIC_TEST_H
 #include <stdlib.h>
-#include <string.h>
 #include <stdio.h>
+#include <stdint.h>
+#include <string.h>
 #include <unistd.h>
 #include <time.h>
 
