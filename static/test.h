@@ -1,5 +1,6 @@
-#ifndef STATIC_TEST_H
-#define STATIC_TEST_H
+#ifndef STATIC_TEST2_H
+#define STATIC_TEST2_H
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
@@ -7,236 +8,234 @@
 #include <unistd.h>
 #include <time.h>
 
-typedef struct test_assertion_t {
+struct {
     const char * name;
-    const char * file;
-    const char * expression;
-	const char * message;
-    int line;
-} test_assertion_t;
+    struct timespec start;
+    struct timespec end;
+    int failed;
+    int position;
+} _test_case;
 
-typedef struct test_case_t {
+struct {
     const char * name;
-	double time;
-    void (*function)();
-} test_case_t;
+    struct timespec start;
+    struct timespec end;
+    int tests;
+    int failures;
+    int position;
+} _test_suite;
 
-typedef struct test_suite_t {
+struct {
     const char * name;
-	double time;
-	time_t timestamp;
-	uint32_t tests;
-	uint32_t failures;
-	int start;
-} test_suite_t;
+    struct timespec start;
+    struct timespec end;
+    int tests;
+    int failures;
+    FILE * file;
+} _test_run;
 
-typedef struct test_run_t {
-	const char * name;
-	double time;
-	uint32_t tests;
-	uint32_t failures;
-	FILE * file;
-} test_run_t;
-
-test_suite_t __test_suite;
-test_case_t __test_case;
-test_assertion_t __test_assertion;
-test_run_t __test_run;
-
-#ifdef STATIC_TEST_REPORT
-	#define TESTS_LENGTH sizeof("tests=\"4294967295\"")
-	#define FAILURES_LENGTH sizeof("failures=\"4294967295\"")
-	#define TIME_LENGTH sizeof("time=\"0.000000\"")
-	#define TIMESTAMP_LENGTH sizeof("timestamp=\"YYYY-MM-DDThh:mm:ssZ\"")
-	#define TESTSUITE_LENGTH (sizeof("    <testsuite name=\"\">") + TESTS_LENGTH + FAILURES_LENGTH + TIME_LENGTH + TIMESTAMP_LENGTH)
-	#define TESTSUITES_LENGTH (sizeof("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<testsuites name=\"\">") + TESTS_LENGTH + FAILURES_LENGTH + TIME_LENGTH)
-
-	void test_report_suites_format() {
-		const char * format = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<testsuites name=\"%s\" tests=\"%d\" failures=\"%d\" time=\"%1.6f\">";
-		double clamped_time = __test_run.time > 9999999. ? 9999999. : __test_run.time;
-		int maximum_length = TESTSUITES_LENGTH + strlen(__test_run.name);
-		int written_length = fprintf(__test_run.file, format, __test_run.name, __test_run.tests, __test_run.failures, clamped_time);
-		fprintf(__test_run.file, "%*s\n", maximum_length-written_length, "");
-	}
-
-	void test_report_open() {
-		__test_run.file = fopen("report.xml", "w");
-		test_report_suites_format();
-	}
-
-	void test_report_close() {
-		int current_position = ftell(__test_run.file);
-		fseek(__test_run.file, 0, 0);
-		test_report_suites_format();
-		fseek(__test_run.file, current_position, 0);
-		fprintf(__test_run.file, "</testsuites>");
-		fclose(__test_run.file);
-	}
-
-	void test_report_suite_format() {
-		char timestamp_string[sizeof("YYYY-MM-DDThh:mm:ssZ")];
-		strftime(timestamp_string, sizeof(timestamp_string), "%FT%TZ", gmtime(&__test_suite.timestamp));
-		const char * format = "    <testsuite name=\"%s\" tests=\"%d\" failures=\"%d\" time=\"%1.6f\" timestamp=\"%s\">";
-		double clamped_time = __test_suite.time > 9999999. ? 9999999. : __test_suite.time;
-		int maximum_length = TESTSUITE_LENGTH + strlen(__test_suite.name);
-		int written_length = fprintf(__test_run.file, format, __test_suite.name, __test_suite.tests, __test_suite.failures, clamped_time, timestamp_string);
-		fprintf(__test_run.file, "%*s\n", maximum_length-written_length, "");
-	}
-
-	void test_report_suite_open() {
-		__test_suite.start = ftell(__test_run.file);
-		test_report_suite_format();
-	}
-
-	void test_report_suite_close() {
-		int current_position = ftell(__test_run.file);
-		fseek(__test_run.file, __test_suite.start, 0);
-		test_report_suite_format();
-		fseek(__test_run.file, current_position, 0);
-		fprintf(__test_run.file, "    </testsuite>\n");
-	}
-
-	void test_report_case_failure() {
-		fprintf(
-			__test_run.file, 
-			"        <testcase name=\"%s()\" time=\"%f\">\n"
-			"            <failure message=\"%s\" type=\"%s\">%s:%d:    %s</failure>\n"
-			"        </testcase>\n",
-			__test_case.name, 
-			__test_case.time,
-			__test_assertion.message,
-			__test_assertion.name,
-			__test_assertion.file, 
-			__test_assertion.line, 
-			__test_assertion.expression
-		);
-			/*message: Die Quellcodedatei, die Zeilennummer und die Regel, gegen die verstoßen wurde.
-type: Die Fehlerkategorie der Regel.*/
-	}
-
-	void test_report_case_success() {
-		fprintf(
-			__test_run.file, 
-			"        <testcase name=\"%s()\" time=\"%f\"></testcase>\n",
-			__test_case.name,
-			__test_case.time
-		);
-	}
-#else
-	void test_report_open() {}
-	void test_report_close() {}
-	void test_report_suite_open() {}
-	void test_report_suite_close() {}
-	void test_report_case_failure() {}
-	void test_report_case_success() {}
-#endif
-
-#ifndef STATIC_TEST_PRINT_START
-	#define STATIC_TEST_PRINT_START {\
-		fprintf(stderr, "\033[1m⬜ TEST %s()\033[0m\n", __test_case.name);\
-	}
-#endif 
-
-#ifndef STATIC_TEST_PRINT_PASS
-	#define STATIC_TEST_PRINT_PASS {\
-		fprintf(stderr, "\033[1;32m✅ PASS %s() (%.3fs)\033[0m\n", __test_case.name, __test_case.time);\
-	}
-#endif
-
-#ifndef STATIC_TEST_PRINT_FAIL
-	#define STATIC_TEST_PRINT_FAIL {\
-		fprintf(stderr, "\033[1;31m⛔ FAIL %s() (%.3fs):\033[0m %s:%d: \n    %s\n", __test_case.name, __test_case.time, __test_assertion.file, __test_assertion.line, __test_assertion.expression);\
-	}
-#endif 
-
-
-double static_test_time() {
-	struct timespec time;
-    clock_gettime(CLOCK_MONOTONIC, &time);
-	return (double)time.tv_sec + 1.0e-9*time.tv_nsec;
+struct timespec _test_get_time() {
+    struct timespec t;    
+    clock_gettime(CLOCK_REALTIME, &t);
+    return t;
 }
 
-time_t static_test_timestamp() {
-	time_t t;
-	time(&t);
-	return t;
+struct timespec _test_delta_time(const struct timespec * start, const struct timespec * stop) {
+    struct timespec delta;
+    delta.tv_sec = stop->tv_sec - start->tv_sec;
+    delta.tv_nsec = stop->tv_nsec - start->tv_nsec;
+    if(delta.tv_nsec < 0) {
+        delta.tv_sec -= 1;
+        delta.tv_nsec = 1000000000 + delta.tv_nsec;
+    }
+    return delta;
 }
 
-void static_test_suite(const char * name, void (*function)()) {
-    __test_suite.name = name;
-	__test_suite.timestamp = static_test_timestamp();
-	__test_suite.time = static_test_time();
-	__test_suite.tests = 0;
-	__test_suite.failures = 0;
-    test_report_suite_open();
-    
-	function();
+// REPORT
 
-	__test_suite.time = static_test_time() - __test_suite.time;
-	__test_run.time += __test_suite.time;
-	__test_run.tests += __test_suite.tests;
-	__test_run.failures += __test_suite.failures;
-    test_report_suite_close();
+#define _TEST_PREFIX_LENGTH sizeof("<?xml version=\"1.0\" encoding=\"UTF-8\"?>")
+#define _TEST_TESTS_LENGTH sizeof("tests=\"4294967295\"")
+#define _TEST_FAILURES_LENGTH sizeof("failures=\"4294967295\"")
+#define _TEST_TIME_LENGTH sizeof("time=\"4294967295.999999999\"")
+#define _TEST_TIMESTAMP_LENGTH sizeof("timestamp=\"YYYY-MM-DDThh:mm:ssZ\"")
+#define _TEST_TESTSUITES_LENGTH (sizeof("<testsuites name=\"\">") + _TEST_TESTS_LENGTH + _TEST_FAILURES_LENGTH + _TEST_TIME_LENGTH)
+#define _TEST_TESTSUITE_LENGTH (sizeof("    <testsuite name=\"\">") + _TEST_TESTS_LENGTH + _TEST_FAILURES_LENGTH + _TEST_TIME_LENGTH + _TEST_TIMESTAMP_LENGTH)
+#define _TEST_TESTCASE_LENGTH (sizeof("        <testcase name=\"\">") + _TEST_TIME_LENGTH)
+
+void _test_report_run_format() {
+    const char * format = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<testsuites name=\"%s\" tests=\"%d\" failures=\"%d\" time=\"%d.%09d\">";
+    struct timespec time = _test_delta_time(&_test_run.start, &_test_run.end);
+    int maximum_length = _TEST_PREFIX_LENGTH + _TEST_TESTSUITES_LENGTH + strlen(_test_run.name);
+    int written_length = fprintf(_test_run.file, format, _test_run.name, _test_run.tests, _test_run.failures, time.tv_sec, time.tv_nsec);
+    fprintf(_test_run.file, "%*s\n", maximum_length-written_length, "");
 }
 
-void static_test_run(const char * name, void (*function)()) {
-	__test_run.name = name;
-	test_report_open();
-	function();
-	test_report_close();
+void _test_report_run_open() {
+    _test_run.file = fopen("report.xml", "w");
+    _test_report_run_format();
 }
 
-void static_test_case(const char * name, void (*function)()) {
-    __test_case.name = name;
-    __test_assertion.file = NULL;
-	__test_suite.tests += 1;
-
-    STATIC_TEST_PRINT_START
-
-	double start = static_test_time();
-	
-	function();
-
-	double end = static_test_time();
-	__test_case.time = end - start;
-
-	if(__test_assertion.file == NULL) {
-        STATIC_TEST_PRINT_PASS
-        test_report_case_success();
-	} else {
-		__test_suite.failures += 1;
-        STATIC_TEST_PRINT_FAIL
-		test_report_case_failure();
-	}
+void _test_report_run_close() {
+    int current_position = ftell(_test_run.file);
+    fseek(_test_run.file, 0, 0);
+    _test_report_run_format();
+    fseek(_test_run.file, current_position, 0);
+    fprintf(_test_run.file, "</testsuites>");
+    fclose(_test_run.file);
 }
 
-void static_test_assert(const char * name, const char * file, int line, const char * expression) {
-    __test_assertion.name = name;
-	__test_assertion.file = file;
-	__test_assertion.line = line;
-	__test_assertion.expression = expression;
+void _test_report_suite_format() {
+    const char * format = "    <testsuite name=\"%s\" tests=\"%d\" failures=\"%d\" time=\"%d.%09d\" timestamp=\"%s\">";
+    struct timespec time = _test_delta_time(&_test_suite.start, &_test_suite.end);
+    char timestamp_string[sizeof("YYYY-MM-DDThh:mm:ssZ")];
+	strftime(timestamp_string, sizeof(timestamp_string), "%FT%TZ", gmtime(&_test_suite.start.tv_sec));
+	int maximum_length = _TEST_TESTSUITE_LENGTH + strlen(_test_suite.name);
+	int written_length = fprintf(_test_run.file, format, _test_suite.name, _test_suite.tests, _test_suite.failures, time.tv_sec, time.tv_nsec, timestamp_string);
+	fprintf(_test_run.file, "%*s\n", maximum_length-written_length, "");
 }
 
-#define STATIC_TEST_ASSERT_F(assertion_name, assertion_file, assertion_line, assertion_expression, assertion_message) {\
-	__test_assertion.name = assertion_name;\
-	__test_assertion.file = assertion_file;\
-	__test_assertion.line = assertion_line;\
-	__test_assertion.expression = assertion_expression;\
-	__test_assertion.message = assertion_message;\
+void _test_report_suite_open() {
+    _test_suite.position = ftell(_test_run.file);
+	_test_report_suite_format();
 }
 
-// if(sizeof(__test_assertion.message) < snprintf(__test_assertion.message, sizeof(__test_assertion.message), __VA_ARGS__)) {
-// 	__test_assertion.message[sizeof(__test_assertion.message) - 2] = '.';
-// 	__test_assertion.message[sizeof(__test_assertion.message) - 3] = '.';
-// 	__test_assertion.message[sizeof(__test_assertion.message) - 4] = '.';
-// }
+void _test_report_suite_close() {
+    int current_position = ftell(_test_run.file);
+    fseek(_test_run.file, _test_suite.position, 0);
+    _test_report_suite_format();
+    fseek(_test_run.file, current_position, 0);
+    fprintf(_test_run.file, "    </testsuite>\n");
+}
 
-#define STATIC_TEST_RUN(test_run_name) static_test_run(#test_run_name, test_run_name)
-#define STATIC_TEST_SUITE(test_suite_name) static_test_suite(#test_suite_name, test_suite_name)
-#define STATIC_TEST_CASE(function) static_test_case(#function, function)
+void _test_report_case_format() {
+    const char * format = "        <testcase name=\"%s\" time=\"%d.%09d\">";
+    struct timespec time = _test_delta_time(&_test_suite.start, &_test_suite.end);
+	int maximum_length = _TEST_TESTCASE_LENGTH + strlen(_test_case.name);
+	int written_length = fprintf(_test_run.file, format, _test_case.name, time.tv_sec, time.tv_nsec);
+	fprintf(_test_run.file, "%*s\n", maximum_length-written_length, "");
+}
 
-#define STATIC_ASSERT_(name, expression, message) if(!(expression)) { STATIC_TEST_ASSERT_F(name, __FILE__, __LINE__, #expression, message); return; }
-#define STATIC_ASSERT(expression) STATIC_ASSERT_("ASSERT", expression, #expression)
-#define STATIC_ASSERT_MESSAGE(expression, message) STATIC_ASSERT_("ASSERT", expression, message)
+void _test_report_case_open() {
+    _test_case.position = ftell(_test_run.file);
+	_test_report_case_format();
+}
 
-#endif /* STATIC_TEST_H */
+void _test_report_case_close() {
+    int current_position = ftell(_test_run.file);
+	fseek(_test_run.file, _test_case.position, 0);
+    _test_report_case_format();
+	fseek(_test_run.file, current_position, 0);
+	fprintf(_test_run.file, "        </testcase>\n");
+}
+
+#define _TEST_REPORT_CASE_FAILURE(_name, _file, _line, _expression, ...) \
+	fprintf(_test_run.file, "            <failure message=\""); \
+	fprintf(_test_run.file, __VA_ARGS__); \
+	fprintf(_test_run.file, "\" type=\"%s\">%s:%d:    %s</failure>\n", _name, _file, _line, #_expression);
+
+#define _TEST_REPORT_CASE_PASS(_name, _file, _line, _expression, ...)
+
+// PRINT
+
+#define _TEST_PRINT_ASSERT_PASS(_name, _file, _line, _expression, ...) \
+    // fprintf(stderr, "\033[1;32m✓ %s:%s:%s:%s(%s) ", _test_run.name, _test_suite.name, _test_case.name, _name, #_expression);\
+    // fprintf(stderr, __VA_ARGS__); \
+	// fprintf(stderr, "\033[0m\n")
+
+#define _TEST_PRINT_ASSERT_FAIL(_name, _file, _line, _expr, ...) {\
+    struct timespec __time = _test_delta_time(&_test_case.start, &_test_case.end); \
+    fprintf(stderr, "\033[1;31m✗ %s:%s:%s (%ld.%09lds)\n  %s:%d:%s: %s ",\
+        _test_run.name, _test_suite.name, _test_case.name, __time.tv_sec, __time.tv_nsec, _file, _line, _name, #_expr); \
+	fprintf(stderr, __VA_ARGS__); \
+	fprintf(stderr, "\033[0m\n"); \
+}
+
+#define _TEST_PRINT_CASE_OPEN \
+    fprintf(stderr, "\033[1m➤ %s:%s:%s\033[0m\n", _test_run.name, _test_suite.name, _test_case.name);
+
+#define _TEST_PRINT_CASE_CLOSE \
+	fprintf(stderr, "\n");
+
+#define _TEST_PRINT_CASE_PASS {\
+    struct timespec __time = _test_delta_time(&_test_case.start, &_test_case.end); \
+	fprintf(stderr, "\033[1;32m✓ %s:%s:%s (%ld.%09lds)\033[0m\n", _test_run.name, _test_suite.name, _test_case.name, __time.tv_sec, __time.tv_nsec);\
+}
+
+void _test_case_(const char * name, void(*function)()) {
+    _test_case.name = name; 
+    _test_case.start = _test_get_time(); 
+    _test_case.failed = 0; 
+    _test_case.position = 0;
+
+    _test_report_case_open();
+    _TEST_PRINT_CASE_OPEN
+
+    function();
+
+    if(!_test_case.failed) {
+        _test_case.end = _test_get_time();
+        _TEST_PRINT_CASE_PASS
+    }
+
+    _test_report_case_close();
+    _TEST_PRINT_CASE_CLOSE
+
+    _test_suite.failures += _test_case.failed;
+    _test_suite.tests += 1;
+}
+
+void _test_suite_(const char * name, void(*function)()) {
+    _test_suite.name = name; 
+    _test_suite.start = _test_get_time(); 
+    _test_suite.failures = 0;
+    _test_suite.position = 0;
+    _test_suite.tests = 0;
+
+    _test_report_suite_open();
+
+    function();
+    _test_suite.end = _test_get_time();
+
+    _test_report_suite_close();
+
+    _test_run.tests += _test_suite.tests;
+    _test_run.failures += _test_suite.failures;
+}
+
+int _test_run_(const char * name, void (*function)()) {
+    _test_run.name = name;
+    _test_run.start = _test_get_time();
+    _test_run.failures = 0;
+    _test_run.tests = 0;
+
+    _test_report_run_open();
+
+    function();
+    _test_run.end = _test_get_time();
+
+    _test_report_run_close();
+
+    return _test_run.failures > 0;
+}
+
+
+#define _TEST_ASSERT(_name, _file, _line, _expression, ...) \
+	if((_expression)) { \
+        _TEST_PRINT_ASSERT_PASS(_name, _file, _line, _expression, __VA_ARGS__); \
+        _TEST_REPORT_CASE_PASS(_name, _file, _line, _expression, __VA_ARGS__); \
+	} else { \
+        _test_case.end = _test_get_time(); \
+        _test_case.failed += 1; \
+        _TEST_PRINT_ASSERT_FAIL(_name, _file, _line, _expression, __VA_ARGS__); \
+        _TEST_REPORT_CASE_FAILURE(_name, _file, _line, _expression, __VA_ARGS__); \
+        return; \
+    }
+
+#define TEST_CASE(function) _test_case_(#function, function)
+#define TEST_SUITE(function) _test_suite_(#function, function)
+#define TEST_RUN(function) _test_run_(#function, function);
+
+#define TEST_ASSERT_MESSAGE(expression, ...) _TEST_ASSERT("TEST_ASSERT_MESSAGE", __FILE__, __LINE__, expression, __VA_ARGS__)
+#define TEST_ASSERT(expression) _TEST_ASSERT("TEST_ASSERT", __FILE__, __LINE__, expression, "")
+
+#endif /* STATIC_TEST2_H */
