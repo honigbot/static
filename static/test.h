@@ -23,6 +23,7 @@ struct {
     const char * name;
     struct timespec start;
     struct timespec end;
+    struct timespec time;
     int failed;
     int passed;
     int status;
@@ -34,6 +35,7 @@ struct {
     const char * name;
     struct timespec start;
     struct timespec end;
+    struct timespec time;
     int tests;
     int failures;
     int disabled;
@@ -46,6 +48,7 @@ struct {
     const char * name;
     struct timespec start;
     struct timespec end;
+    struct timespec time;
     int tests;
     int failures;
     FILE * file;
@@ -82,9 +85,8 @@ struct timespec _test_time_delta(const struct timespec * start, const struct tim
 
 void _test_report_run_format() {
     const char * format = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<testsuites name=\"%s\" tests=\"%d\" failures=\"%d\" time=\"%d.%09d\">";
-    struct timespec time = _test_time_delta(&_test_run.start, &_test_run.end);
     int maximum_length = _TEST_PREFIX_LENGTH + _TEST_TESTSUITES_LENGTH + strlen(_test_run.name);
-    int written_length = fprintf(_test_run.file, format, _test_run.name, _test_run.tests, _test_run.failures, time.tv_sec, time.tv_nsec);
+    int written_length = fprintf(_test_run.file, format, _test_run.name, _test_run.tests, _test_run.failures, _test_run.time.tv_sec, _test_run.time.tv_nsec);
     fprintf(_test_run.file, "%*s\n", maximum_length-written_length, "");
 }
 
@@ -104,13 +106,12 @@ void _test_report_run_close() {
 
 void _test_report_suite_format() {
     const char * format = "    <testsuite name=\"%s\" tests=\"%d\" failures=\"%d\" hostname=\"%s\" time=\"%d.%09d\" timestamp=\"%s\">";
-    struct timespec time = _test_time_delta(&_test_suite.start, &_test_suite.end);
     char timestamp_string[sizeof("YYYY-MM-DDThh:mm:ssZ")];
     strftime(timestamp_string, sizeof(timestamp_string), "%FT%TZ", gmtime(&_test_suite.start.tv_sec));
     char hostname_string[TEST_MAX_HOSTNAME_LENGTH];
     gethostname(hostname_string,  sizeof(hostname_string));
     int maximum_length = _TEST_TESTSUITE_LENGTH + strlen(_test_suite.name);
-    int written_length = fprintf(_test_run.file, format, _test_suite.name, _test_suite.tests, _test_suite.failures, hostname_string, time.tv_sec, time.tv_nsec, timestamp_string);
+    int written_length = fprintf(_test_run.file, format, _test_suite.name, _test_suite.tests, _test_suite.failures, hostname_string, _test_suite.time.tv_sec, _test_suite.time.tv_nsec, timestamp_string);
     fprintf(_test_run.file, "%*s\n", maximum_length-written_length, "");
 }
 
@@ -129,9 +130,8 @@ void _test_report_suite_close() {
 
 void _test_report_case_format() {
     const char * format = "        <testcase name=\"%s\" time=\"%d.%09d\">";
-    struct timespec time = _test_time_delta(&_test_case.start, &_test_case.end);
     int maximum_length = _TEST_TESTCASE_LENGTH + strlen(_test_case.name);
-    int written_length = fprintf(_test_run.file, format, _test_case.name, time.tv_sec, time.tv_nsec);
+    int written_length = fprintf(_test_run.file, format, _test_case.name, _test_case.time.tv_sec, _test_case.time.tv_nsec);
     fprintf(_test_run.file, "%*s\n", maximum_length-written_length, "");
 }
 
@@ -197,14 +197,12 @@ void _test_print_case_close() {
 
 void _test_print_case_pass() {
     const char * format = "\033[1;32m‣ %s:%s:%s (%ld.%09lds)\033[0m\n";
-    struct timespec time = _test_time_delta(&_test_case.start, &_test_case.end);
-    fprintf(stderr, format, _test_run.name, _test_suite.name, _test_case.name, time.tv_sec, time.tv_nsec);
+    fprintf(stderr, format, _test_run.name, _test_suite.name, _test_case.name, _test_case.time.tv_sec, _test_case.time.tv_nsec);
 }
 
 void _test_print_case_fail() {
     const char * format = "\033[1;31m‣ %s:%s:%s (%ld.%09lds)\033[0m\n";
-    struct timespec time = _test_time_delta(&_test_case.start, &_test_case.end);
-    fprintf(stderr, format, _test_run.name, _test_suite.name, _test_case.name, time.tv_sec, time.tv_nsec);
+    fprintf(stderr, format, _test_run.name, _test_suite.name, _test_case.name, _test_case.time.tv_sec, _test_case.time.tv_nsec);
 }
 
 
@@ -233,6 +231,7 @@ void _test_case_(const char * name, void(*function)()) {
 
     function();
     _test_case.end = _test_time_now();
+    _test_case.time = _test_time_delta(&_test_case.start, &_test_case.end);
 
     if(!_test_case.failed) {
         _TEST_CASE_PASS
@@ -258,6 +257,7 @@ void _test_suite_(const char * name, void(*function)()) {
 
     function();
     _test_suite.end = _test_time_now();
+    _test_suite.time = _test_time_delta(&_test_suite.start, &_test_suite.end);
 
     _TEST_SUITE_CLOSE
 
@@ -276,6 +276,7 @@ int _test_run_(const char * name, void (*function)()) {
 
     function();
     _test_run.end = _test_time_now();
+    _test_run.time = _test_time_delta(&_test_run.start, &_test_run.end);
 
     _TEST_RUN_CLOSE
 
