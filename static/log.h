@@ -22,14 +22,14 @@ extern "C" {
 }
 
 #ifndef STATIC_LOG_FORMAT_PREFIX
-    #define STATIC_LOG_FORMAT_PREFIX(message, size, level, file, function, line, format, ...) {\
+    #define STATIC_LOG_FORMAT_PREFIX(message, size, level, file, function, line, ...) {\
         static const char * prefix[] = { "TRACE", "DEBUG", "INFO ", "WARN ", "ERROR", "FATAL" };\
         STATIC_LOG_FORMAT_(snprintf, message, size, "%s", prefix[level]);\
     }
 #endif
 
 #ifndef STATIC_LOG_FORMAT_TIME
-    #define STATIC_LOG_FORMAT_TIME(message, size, level, file, function, line, format, ...) {\
+    #define STATIC_LOG_FORMAT_TIME(message, size, level, file, function, line, ...) {\
         struct timespec time_spec;\
         clock_gettime(CLOCK_REALTIME, &time_spec);\
         struct tm * time_info = localtime(&time_spec.tv_sec);\
@@ -39,7 +39,7 @@ extern "C" {
 #endif
 
 #ifndef STATIC_LOG_FORMAT_LOCATION
-    #define STATIC_LOG_FORMAT_LOCATION(message, size, level, file, function, line, format, ...) {\
+    #define STATIC_LOG_FORMAT_LOCATION(message, size, level, file, function, line, ...) {\
         const char * last_slash = strrchr(file, '/');\
         const char * file_name = last_slash ? last_slash + 1 : file;\
         STATIC_LOG_FORMAT_(snprintf, message, size, "%s:%s:%d", file_name, function, line);\
@@ -67,10 +67,10 @@ extern "C" {
 #endif
 
 #define STATIC_LOG_START(level, file, function, line, ...) {\
-    static int size=0;\
-    static char message[STATIC_LOG_BUFFER_SIZE];\
-    STATIC_LOG_FORMAT_MESSAGE(message, size, level, file, function, line, __VA_ARGS__);\
-    fprintf(stderr, "%s\n", message);\
+    int _log_size=0;\
+    static char _log_message[STATIC_LOG_BUFFER_SIZE];\
+    STATIC_LOG_FORMAT_MESSAGE(_log_message, _log_size, level, file, function, line, __VA_ARGS__);\
+    fprintf(stderr, "%s\n", _log_message);\
 }
         
 #if STATIC_LOG_LEVEL <= STATIC_LOG_LEVEL_FATAL
