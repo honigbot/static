@@ -8,6 +8,17 @@
 #include <unistd.h>
 #include <time.h>
 
+#define TEST_MAX_HOSTNAME_LENGTH 256
+#define TEST_MAX_MESSAGE_LENGTH 512
+
+struct {
+    const char * name;
+    const char * expression;
+    const char * file;
+    int line;
+    char message[TEST_MAX_MESSAGE_LENGTH];
+} _test_assertion;
+
 struct {
     const char * name;
     struct timespec start;
@@ -56,9 +67,6 @@ struct timespec _test_time_delta(const struct timespec * start, const struct tim
     }
     return delta;
 }
-
-void _test_empty() {}
-#define TEST_MAX_HOSTNAME_LENGTH 256
 
 // REPORT
 
@@ -140,24 +148,43 @@ void _test_report_case_close() {
 	fprintf(_test_run.file, "        </testcase>\n");
 }
 
-#define _TEST_REPORT_ASSERT_FAIL(_name, _file, _line, _expression, ...) \
-	fprintf(_test_run.file, "            <failure message=\""); \
-	fprintf(_test_run.file, " "__VA_ARGS__); \
-	fprintf(_test_run.file, "\" type=\"%s\">%s:%d:    %s</failure>\n", _name, _file, _line, _expression);
+void _testf_fprintf_xml_escaped(const char * string) {
+    for(const char * s = string; *s; ) {
+        int length = strlen(s);
+        int next_replace = strcspn(s, "\"\'<>&");
+        fprintf(_test_run.file, "%.*s", next_replace, s);
+        if(next_replace >= length) return;
 
-#define _TEST_REPORT_ASSERT_PASS(_name, _file, _line, _expression, ...)
+        switch(s[next_replace]) {
+            case '\"': fprintf(_test_run.file, "&quot;"); break;
+            case '\'': fprintf(_test_run.file, "&apos;"); break;
+            case '<': fprintf(_test_run.file, "&lt;"); break;
+            case '>': fprintf(_test_run.file, "&gt;"); break;
+            case '&': fprintf(_test_run.file, "&amp;"); break;
+            default: break;
+        }
+        s += next_replace+1;
+    }
+}
+
+void _test_report_assert_fail() {
+    fprintf(_test_run.file, "            <failure message=\"%s:%d: ", _test_assertion.file, _test_assertion.line);
+    _testf_fprintf_xml_escaped(_test_assertion.expression); 
+    fprintf(_test_run.file, " ");
+    _testf_fprintf_xml_escaped(_test_assertion.message);
+    fprintf(_test_run.file, "\" type=\"%s\">\n            </failure>\n", _test_assertion.name);
+}
 
 // PRINT
 
-#define _TEST_PRINT_ASSERT_PASS(_name, _file, _line, _expression, ...) \
-    fprintf(stderr, "\033[1;32m‣ %s:%s:%s:%s(%s)", _test_run.name, _test_suite.name, _test_case.name, _name, _expression); \
-    fprintf(stderr, " "__VA_ARGS__); \
-	fprintf(stderr, "\033[0m\n") \
+void _test_print_assert_pass() {
+    const char * format = "\033[1;32m‣ %s:%s:%s:%s(%s) %s\033[0m\n";
+    fprintf(stderr, format, _test_run.name, _test_suite.name, _test_case.name, _test_assertion.name, _test_assertion.expression, _test_assertion.message);
+}
 
-#define _TEST_PRINT_ASSERT_FAIL(_name, _file, _line, _expression, ...) { \
-    fprintf(stderr, "\033[1;31m‣ %s:%d:%s: %s", _file, _line, _name, _expression); \
-	fprintf(stderr, " "__VA_ARGS__); \
-	fprintf(stderr, "\033[0m\n"); \
+void _test_print_assert_fail() {
+    const char * format = "\033[1;31m‣ %s:%d:%s: %s %s\033[0m\n";
+    fprintf(stderr, format, _test_assertion.file, _test_assertion.line, _test_assertion.name, _test_assertion.expression, _test_assertion.message);
 }
 
 void _test_print_case_open() {
@@ -169,13 +196,15 @@ void _test_print_case_close() {
 }
 
 void _test_print_case_pass() {
-    struct timespec __time = _test_time_delta(&_test_case.start, &_test_case.end); \
-	fprintf(stderr, "\033[1;32m‣ %s:%s:%s (%ld.%09lds)\033[0m\n", _test_run.name, _test_suite.name, _test_case.name, __time.tv_sec, __time.tv_nsec);\
+    const char * format = "\033[1;32m‣ %s:%s:%s (%ld.%09lds)\033[0m\n";
+    struct timespec time = _test_time_delta(&_test_case.start, &_test_case.end);
+	fprintf(stderr, format, _test_run.name, _test_suite.name, _test_case.name, time.tv_sec, time.tv_nsec);
 }
 
 void _test_print_case_fail() {
-    struct timespec __time = _test_time_delta(&_test_case.start, &_test_case.end); \
-	fprintf(stderr, "\033[1;31m‣ %s:%s:%s (%ld.%09lds)\033[0m\n", _test_run.name, _test_suite.name, _test_case.name, __time.tv_sec, __time.tv_nsec);\
+    const char * format = "\033[1;31m‣ %s:%s:%s (%ld.%09lds)\033[0m\n";
+    struct timespec time = _test_time_delta(&_test_case.start, &_test_case.end);
+	fprintf(stderr, format, _test_run.name, _test_suite.name, _test_case.name, time.tv_sec, time.tv_nsec);
 }
 
 
@@ -189,11 +218,8 @@ void _test_print_case_fail() {
 #define _TEST_SUITE_CLOSE _test_report_suite_close();
 #define _TEST_RUN_OPEN _test_report_run_open();
 #define _TEST_RUN_CLOSE _test_report_run_close();
-#define TEST_ASSERT_PASS(_name, _file, _line, _expression, ...) \
-    _TEST_REPORT_ASSERT_PASS(_name, _file, _line, _expression, __VA_ARGS__);
-#define TEST_ASSERT_FAIL(_name, _file, _line, _expression, ...) \
-    _TEST_PRINT_ASSERT_FAIL(_name, _file, _line, _expression, __VA_ARGS__); \
-    _TEST_REPORT_ASSERT_FAIL(_name, _file, _line, _expression, __VA_ARGS__); 
+#define TEST_ASSERT_PASS
+#define TEST_ASSERT_FAIL _test_print_assert_fail(); _test_report_assert_fail();
 
 void _test_case_(const char * name, void(*function)()) {
     _test_case.name = name; 
@@ -256,21 +282,30 @@ int _test_run_(const char * name, void (*function)()) {
     return _test_run.failures > 0;
 }
 
-#define _TEST_ASSERT(_name, _file, _line, _expression, ...) \
-	if((_expression)) { \
-        _test_case.passed += 1; \
-        TEST_ASSERT_PASS(_name, _file, _line, #_expression, __VA_ARGS__); \
-	} else { \
-        _test_case.failed += 1; \
-        TEST_ASSERT_FAIL(_name, _file, _line, #_expression, __VA_ARGS__); \
-        return; \
+void _test_assert(int result) {
+    if(result) {
+        _test_case.passed += 1;
+        TEST_ASSERT_PASS
+	} else {
+        _test_case.failed += 1;
+        TEST_ASSERT_FAIL
+        return;
     }
+}
+
+#define _TEST_ASSERT(_name, _file, _line, _expression, ...) \
+    _test_assertion.name = _name; \
+    _test_assertion.file = _file; \
+    _test_assertion.line = _line;  \
+    _test_assertion.expression = #_expression; \
+    snprintf(_test_assertion.message, sizeof(_test_assertion.message), __VA_ARGS__); \
+	_test_assert(_expression);
 
 #define TEST_CASE(function) _test_case_(#function, function)
 #define TEST_SUITE(function) _test_suite_(#function, function)
 #define TEST_RUN(function) _test_run_(#function, function);
 
 #define TEST_ASSERT_MESSAGE(expression, ...) _TEST_ASSERT("TEST_ASSERT_MESSAGE", __FILE__, __LINE__, expression, __VA_ARGS__)
-#define TEST_ASSERT(expression) _TEST_ASSERT("TEST_ASSERT", __FILE__, __LINE__, expression, "")
+#define TEST_ASSERT(expression) _TEST_ASSERT("TEST_ASSERT", __FILE__, __LINE__, expression, " ")
 
 #endif /* STATIC_TEST_H */
