@@ -8,15 +8,24 @@
 #include <unistd.h>
 #include <time.h>
 
-#define TEST_MAX_HOSTNAME_LENGTH 256
-#define TEST_MAX_MESSAGE_LENGTH 512
+#ifndef TEST_REPORT
+    #define TEST_REPORT "report.xml"
+#endif
+
+#ifndef TEST_HOSTNAME_LENGTH
+    #define TEST_HOSTNAME_LENGTH 256
+#endif
+
+#ifndef TEST_MESSAGE_LENGTH
+    #define TEST_MESSAGE_LENGTH 512
+#endif
 
 struct {
     const char * name;
     const char * expression;
     const char * file;
     int line;
-    char message[TEST_MAX_MESSAGE_LENGTH];
+    char message[TEST_MESSAGE_LENGTH];
 } _test_assertion;
 
 struct {
@@ -78,7 +87,7 @@ struct timespec _test_time_delta(const struct timespec * start, const struct tim
 #define _TEST_FAILURES_LENGTH sizeof("failures=\"4294967295\"")
 #define _TEST_TIME_LENGTH sizeof("time=\"4294967295.999999999\"")
 #define _TEST_TIMESTAMP_LENGTH sizeof("timestamp=\"YYYY-MM-DDThh:mm:ssZ\"")
-#define _TEST_HOSTNAME_LENGTH sizeof("hostname=\"\"") + TEST_MAX_HOSTNAME_LENGTH
+#define _TEST_HOSTNAME_LENGTH sizeof("hostname=\"\"") + TEST_HOSTNAME_LENGTH
 #define _TEST_TESTSUITES_LENGTH (sizeof("<testsuites name=\"\">") + _TEST_TESTS_LENGTH + _TEST_FAILURES_LENGTH + _TEST_TIME_LENGTH)
 #define _TEST_TESTSUITE_LENGTH (sizeof("    <testsuite name=\"\">") + _TEST_TESTS_LENGTH + _TEST_FAILURES_LENGTH + _TEST_HOSTNAME_LENGTH + _TEST_TIME_LENGTH + _TEST_TIMESTAMP_LENGTH)
 #define _TEST_TESTCASE_LENGTH (sizeof("        <testcase name=\"\">") + _TEST_TIME_LENGTH)
@@ -91,7 +100,7 @@ void _test_report_run_format() {
 }
 
 void _test_report_run_open() {
-    _test_run.file = fopen("report.xml", "w");
+    _test_run.file = fopen(TEST_REPORT, "w");
     _test_report_run_format();
 }
 
@@ -108,7 +117,7 @@ void _test_report_suite_format() {
     const char * format = "    <testsuite name=\"%s\" tests=\"%d\" failures=\"%d\" hostname=\"%s\" time=\"%d.%09d\" timestamp=\"%s\">";
     char timestamp_string[sizeof("YYYY-MM-DDThh:mm:ssZ")];
     strftime(timestamp_string, sizeof(timestamp_string), "%FT%TZ", gmtime(&_test_suite.start.tv_sec));
-    char hostname_string[TEST_MAX_HOSTNAME_LENGTH];
+    char hostname_string[TEST_HOSTNAME_LENGTH];
     gethostname(hostname_string,  sizeof(hostname_string));
     int maximum_length = _TEST_TESTSUITE_LENGTH + strlen(_test_suite.name);
     int written_length = fprintf(_test_run.file, format, _test_suite.name, _test_suite.tests, _test_suite.failures, hostname_string, _test_suite.time.tv_sec, _test_suite.time.tv_nsec, timestamp_string);
