@@ -106,17 +106,17 @@ void _test_report_suite_format() {
     const char * format = "    <testsuite name=\"%s\" tests=\"%d\" failures=\"%d\" hostname=\"%s\" time=\"%d.%09d\" timestamp=\"%s\">";
     struct timespec time = _test_time_delta(&_test_suite.start, &_test_suite.end);
     char timestamp_string[sizeof("YYYY-MM-DDThh:mm:ssZ")];
-	strftime(timestamp_string, sizeof(timestamp_string), "%FT%TZ", gmtime(&_test_suite.start.tv_sec));
+    strftime(timestamp_string, sizeof(timestamp_string), "%FT%TZ", gmtime(&_test_suite.start.tv_sec));
     char hostname_string[TEST_MAX_HOSTNAME_LENGTH];
     gethostname(hostname_string,  sizeof(hostname_string));
-	int maximum_length = _TEST_TESTSUITE_LENGTH + strlen(_test_suite.name);
-	int written_length = fprintf(_test_run.file, format, _test_suite.name, _test_suite.tests, _test_suite.failures, hostname_string, time.tv_sec, time.tv_nsec, timestamp_string);
-	fprintf(_test_run.file, "%*s\n", maximum_length-written_length, "");
+    int maximum_length = _TEST_TESTSUITE_LENGTH + strlen(_test_suite.name);
+    int written_length = fprintf(_test_run.file, format, _test_suite.name, _test_suite.tests, _test_suite.failures, hostname_string, time.tv_sec, time.tv_nsec, timestamp_string);
+    fprintf(_test_run.file, "%*s\n", maximum_length-written_length, "");
 }
 
 void _test_report_suite_open() {
     _test_suite.position = ftell(_test_run.file);
-	_test_report_suite_format();
+    _test_report_suite_format();
 }
 
 void _test_report_suite_close() {
@@ -130,22 +130,22 @@ void _test_report_suite_close() {
 void _test_report_case_format() {
     const char * format = "        <testcase name=\"%s\" time=\"%d.%09d\">";
     struct timespec time = _test_time_delta(&_test_case.start, &_test_case.end);
-	int maximum_length = _TEST_TESTCASE_LENGTH + strlen(_test_case.name);
-	int written_length = fprintf(_test_run.file, format, _test_case.name, time.tv_sec, time.tv_nsec);
-	fprintf(_test_run.file, "%*s\n", maximum_length-written_length, "");
+    int maximum_length = _TEST_TESTCASE_LENGTH + strlen(_test_case.name);
+    int written_length = fprintf(_test_run.file, format, _test_case.name, time.tv_sec, time.tv_nsec);
+    fprintf(_test_run.file, "%*s\n", maximum_length-written_length, "");
 }
 
 void _test_report_case_open() {
     _test_case.position = ftell(_test_run.file);
-	_test_report_case_format();
+    _test_report_case_format();
 }
 
 void _test_report_case_close() {
     int current_position = ftell(_test_run.file);
-	fseek(_test_run.file, _test_case.position, 0);
+    fseek(_test_run.file, _test_case.position, 0);
     _test_report_case_format();
-	fseek(_test_run.file, current_position, 0);
-	fprintf(_test_run.file, "        </testcase>\n");
+    fseek(_test_run.file, current_position, 0);
+    fprintf(_test_run.file, "        </testcase>\n");
 }
 
 void _testf_fprintf_xml_escaped(const char * string) {
@@ -198,13 +198,13 @@ void _test_print_case_close() {
 void _test_print_case_pass() {
     const char * format = "\033[1;32m‣ %s:%s:%s (%ld.%09lds)\033[0m\n";
     struct timespec time = _test_time_delta(&_test_case.start, &_test_case.end);
-	fprintf(stderr, format, _test_run.name, _test_suite.name, _test_case.name, time.tv_sec, time.tv_nsec);
+    fprintf(stderr, format, _test_run.name, _test_suite.name, _test_case.name, time.tv_sec, time.tv_nsec);
 }
 
 void _test_print_case_fail() {
     const char * format = "\033[1;31m‣ %s:%s:%s (%ld.%09lds)\033[0m\n";
     struct timespec time = _test_time_delta(&_test_case.start, &_test_case.end);
-	fprintf(stderr, format, _test_run.name, _test_suite.name, _test_case.name, time.tv_sec, time.tv_nsec);
+    fprintf(stderr, format, _test_run.name, _test_suite.name, _test_case.name, time.tv_sec, time.tv_nsec);
 }
 
 
@@ -286,7 +286,7 @@ void _test_assert(int result) {
     if(result) {
         _test_case.passed += 1;
         TEST_ASSERT_PASS
-	} else {
+    } else {
         _test_case.failed += 1;
         TEST_ASSERT_FAIL
         return;
@@ -299,7 +299,7 @@ void _test_assert(int result) {
     _test_assertion.line = _line;  \
     _test_assertion.expression = #_expression; \
     snprintf(_test_assertion.message, sizeof(_test_assertion.message), __VA_ARGS__); \
-	_test_assert(_expression);
+    _test_assert(_expression);
 
 #define TEST_CASE(function) _test_case_(#function, function)
 #define TEST_SUITE(function) _test_suite_(#function, function)
