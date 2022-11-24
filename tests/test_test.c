@@ -1,10 +1,15 @@
 #include "static/test.h"
+#include "static/log.h"
 
 void fail() {
+    STATIC_LOG_INFO("a");
+    STATIC_LOG_INFO("b")
     TEST_ASSERT_MESSAGE(1 <= 0, "error: %d is bigger than %d", 1, 0);
 }
 
 void pass() {
+    STATIC_LOG_INFO("a");
+    STATIC_LOG_INFO("b")
     TEST_ASSERT(1 >= 0);
 }
 
