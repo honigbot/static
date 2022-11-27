@@ -28,6 +28,6 @@ void run() {
     TEST_SUITE(suite2);
 }
 
-int main() {
-    return TEST_RUN(run);
+int main(int argc, char ** argv) {
+    return TEST_RUN(run, argc, argv);
 }

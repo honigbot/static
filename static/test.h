@@ -274,7 +274,7 @@ void _test_suite_(const char * name, void(*function)()) {
     _test_run.failures += _test_suite.failures;
 }
 
-int _test_run_(const char * name, void (*function)()) {
+int _test_run_(const char * name, void (*function)(), int argc, char ** argv) {
     _test_run.name = name;
     _test_run.start = _test_time_now();
     _test_run.end = _test_run.start;
@@ -313,7 +313,7 @@ void _test_assert(int result) {
 
 #define TEST_CASE(function) _test_case_(#function, function)
 #define TEST_SUITE(function) _test_suite_(#function, function)
-#define TEST_RUN(function) _test_run_(#function, function);
+#define TEST_RUN(function, argc, argv) _test_run_(#function, function, argc, argv);
 
 #define TEST_ASSERT_MESSAGE(expression, ...) _TEST_ASSERT("TEST_ASSERT_MESSAGE", __FILE__, __LINE__, expression, __VA_ARGS__)
 #define TEST_ASSERT(expression) _TEST_ASSERT("TEST_ASSERT", __FILE__, __LINE__, expression, " ")
