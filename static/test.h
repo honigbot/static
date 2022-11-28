@@ -1,14 +1,16 @@
 #ifndef STATIC_TEST_H
 #define STATIC_TEST_H
 
-#include <stdlib.h>
+#define _POSIX_SOURCE
+#define __USE_POSIX199309
+
 #include <stdio.h>
+#include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
 #include <unistd.h>
-
-#define __USE_POSIX199309
 #include <time.h>
+
 #define _TEST_UNUSED(x) (void)(x)
 
 #ifndef TEST_REPORT
