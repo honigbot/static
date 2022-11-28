@@ -6,8 +6,10 @@
 #include <stdint.h>
 #include <string.h>
 #include <unistd.h>
+
 #define __USE_POSIX199309
 #include <time.h>
+#define _TEST_UNUSED(x) (void)(x)
 
 #ifndef TEST_REPORT
     #define TEST_REPORT "report.xml"
@@ -352,6 +354,8 @@ void _test_suite_(const char * name, void(*function)()) {
 }
 
 int _test_run_(const char * name, void (*function)(), int argc, char ** argv) {
+    _TEST_UNUSED(argc);
+    _TEST_UNUSED(argv);
     _test_run.name = name;
     _test_run.timestamp = _test_time_now();
     _test_run.time = _test_time_zero();
