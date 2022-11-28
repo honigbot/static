@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <unistd.h>
+#define __USE_POSIX199309
 #include <time.h>
 
 #ifndef TEST_REPORT
