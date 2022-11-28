@@ -8,7 +8,7 @@
 #include <unistd.h>
 #include <time.h>
 
-#define _TEST_UNUSED(x) (void)(x)
+#define _TEST_UNUSED(x) (void)(1+x)
 
 #ifndef TEST_REPORT
     #define TEST_REPORT "report.xml"
