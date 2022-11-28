@@ -1,9 +1,6 @@
 #ifndef STATIC_TEST_H
 #define STATIC_TEST_H
 
-#define _POSIX_SOURCE
-#define __USE_POSIX199309
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
