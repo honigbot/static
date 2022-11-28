@@ -3,7 +3,7 @@ Single-file, header-only, dependency-free libraries for testing, logging, tracin
 
 |Library|LOC|Tests|Coverage|Result|
 |-|-|-|-|-|
-|[test.h](#testh)|400||||
+|[test.h](#testh)|403||||
 |[log.h](#logh)|116||||
 |trace.h|||||
 |terminal.h|||||
