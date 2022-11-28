@@ -128,7 +128,7 @@ void _test_report_open() {
 }
 
 void _test_report_close() {
-    ftruncate(fileno(_test_report.file), ftell(_test_report.file));
+    _TEST_UNUSED(ftruncate(fileno(_test_report.file), ftell(_test_report.file)));
     fclose(_test_report.file);
 }
 
