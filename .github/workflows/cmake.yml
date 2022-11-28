@@ -37,11 +37,3 @@ jobs:
       with:
         report_paths: 'report.xml'
         check_name: 'report'
-
-    - name: Report2
-      uses: dorny/test-reporter@v1
-      if: always()    # run this step even if previous step failed
-      with:
-        name: report2    # Name of the check run which will be created
-        path: report.xml    # Path to test results
-        reporter: jest-junit        # Format of test results
