@@ -370,18 +370,27 @@ int _test_run_(const char * name, void (*function)(), int argc, char ** argv) {
     return 0;
 }
 
-void _test_assert(int result) {
+int _test_assert(int result) {
     if(result) {
         _test_case.passed += 1;
         _TEST_ASSERT_PASS
+        return 0;
     } else {
         _test_case.failed += 1;
         _TEST_ASSERT_FAIL
-        return;
+        return 1;
     }
 }
 
 #define _TEST_ASSERT(_name, _file, _line, _expression, ...) \
+    _test_assertion.name = _name; \
+    _test_assertion.file = _file; \
+    _test_assertion.line = _line;  \
+    _test_assertion.expression = #_expression; \
+    snprintf(_test_assertion.message, sizeof(_test_assertion.message), __VA_ARGS__); \
+    if(_test_assert(_expression)) return;
+
+#define _TEST_EXPECT(_name, _file, _line, _expression, ...) \
     _test_assertion.name = _name; \
     _test_assertion.file = _file; \
     _test_assertion.line = _line;  \
@@ -394,6 +403,7 @@ void _test_assert(int result) {
 #define TEST_RUN(function, argc, argv) _test_run_(#function, function, argc, argv);
 
 #define TEST_ASSERT_MESSAGE(expression, ...) _TEST_ASSERT("TEST_ASSERT_MESSAGE", __FILE__, __LINE__, expression, __VA_ARGS__)
+#define TEST_EXPECT_MESSAGE(expression, ...) _TEST_EXPECT("TEST_ASSERT_MESSAGE", __FILE__, __LINE__, expression, __VA_ARGS__)
 #define TEST_ASSERT(expression) _TEST_ASSERT("TEST_ASSERT", __FILE__, __LINE__, expression, " ")
-
+#define TEST_EXPECT(expression) _TEST_EXPECT("TEST_EXPECT", __FILE__, __LINE__, expression, " ")
 #endif /* STATIC_TEST_H */
