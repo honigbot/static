@@ -270,7 +270,9 @@ void _test_print_assert_pass() {
 
 void _test_print_assert_fail() {
     const char * format = "\033[1;31m‣ %s:%d:%s: %s %s\033[0m\n";
-    fprintf(stderr, format, _test_assertion.file, _test_assertion.line, _test_assertion.name, _test_assertion.expression, _test_assertion.message);
+    const char * last_slash = strrchr(_test_assertion.file, '/');
+    const char * file_name = last_slash ? last_slash + 1 : _test_assertion.file;
+    fprintf(stderr, format, file_name, _test_assertion.line, _test_assertion.name, _test_assertion.expression, _test_assertion.message);
 }
 
 void _test_print_case_open() {
@@ -353,7 +355,7 @@ void _test_suite_(const char * name, void(*function)()) {
     _TEST_SUITE_CLOSE
 }
 
-int _test_run_(const char * name, void (*function)(), int argc, char ** argv) {
+int _test_run_(int argc, char ** argv, const char * name, void (*function)()) {
     _TEST_UNUSED(argc);
     _TEST_UNUSED(argv);
     _test_run.name = name;
@@ -400,7 +402,7 @@ int _test_assert(int result) {
 
 #define TEST_CASE(function) _test_case_(#function, function)
 #define TEST_SUITE(function) _test_suite_(#function, function)
-#define TEST_RUN(function, argc, argv) _test_run_(#function, function, argc, argv);
+#define TEST_RUN(argc, argv, function) _test_run_(argc, argv, #function, function);
 
 #define TEST_ASSERT_MESSAGE(expression, ...) _TEST_ASSERT("TEST_ASSERT_MESSAGE", __FILE__, __LINE__, expression, __VA_ARGS__)
 #define TEST_EXPECT_MESSAGE(expression, ...) _TEST_EXPECT("TEST_ASSERT_MESSAGE", __FILE__, __LINE__, expression, __VA_ARGS__)
