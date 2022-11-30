@@ -24,5 +24,5 @@ void run() {
 }
 
 int main(int argc, char ** argv) {
-    return TEST_RUN(run, argc, argv);
+    TEST_RUN(argc, argv, run);
 }
