@@ -1,5 +1,5 @@
 # 🔋 static
-Dead-imple, single-file, header-only, dependency-free libraries for testing, logging, tracing and terminal interaction in C.
+Dead-simple, single-file, header-only, dependency-free libraries for testing, logging, tracing and terminal interaction in C.
 
 |Library|LOC|Tests|Coverage|Result|
 |-|-|-|-|-|
