@@ -103,6 +103,11 @@ struct timespec _test_time_zero() {
     return zero;
 }
 
+const char * _test_file_name(const char * path) {
+    const char * last_slash = strrchr(path, '/');
+    return last_slash ? last_slash + 1 : path;
+}
+
 // REPORT
 
 #define _TEST_PREFIX_LENGTH sizeof("<?xml version=\"1.0\" encoding=\"UTF-8\"?>")
@@ -128,7 +133,6 @@ void _test_report_open() {
 }
 
 void _test_report_close() {
-    _TEST_UNUSED(ftruncate(fileno(_test_report.file), ftell(_test_report.file)));
     fclose(_test_report.file);
 }
 
@@ -141,6 +145,7 @@ void _test_report_run_format_open() {
 
 void _test_report_run_format_close() {
     fprintf(_test_report.file, "</testsuites>");
+    _TEST_UNUSED(ftruncate(fileno(_test_report.file), ftell(_test_report.file)));
 }
 
 void _test_report_run_update() {
@@ -211,7 +216,7 @@ void _test_report_fprintf_xml(const char * string) {
 }
 
 void _test_report_case_format_failure() {
-    fprintf(_test_report.file, "            <failure message=\"%s:%d: ", _test_assertion.file, _test_assertion.line);
+    fprintf(_test_report.file, "            <failure message=\"%s:%d: ", _test_file_name(_test_assertion.file), _test_assertion.line);
     _test_report_fprintf_xml(_test_assertion.expression); 
     fprintf(_test_report.file, " ");
     _test_report_fprintf_xml(_test_assertion.message);
@@ -263,41 +268,35 @@ void _test_report_case_close() {
 
 // PRINT
 
-void _test_print_assert_pass() {
-    const char * format = "\033[1;32m‣ %s:%s:%s:%s(%s) %s\033[0m\n";
-    fprintf(stderr, format, _test_run.name, _test_suite.name, _test_case.name, _test_assertion.name, _test_assertion.expression, _test_assertion.message);
-}
-
 void _test_print_assert_fail() {
-    const char * format = "\033[1;31m‣ %s:%d:%s: %s %s\033[0m\n";
-    const char * last_slash = strrchr(_test_assertion.file, '/');
-    const char * file_name = last_slash ? last_slash + 1 : _test_assertion.file;
-    fprintf(stderr, format, file_name, _test_assertion.line, _test_assertion.name, _test_assertion.expression, _test_assertion.message);
+    const char * format = "[\033[0;31mFAIL\033[0m] %s:%s:%s %s:%d: %s: %s (%s)\033[0m\n";    
+    fprintf(stderr, format, _test_run.name, _test_suite.name, _test_case.name, _test_file_name(_test_assertion.file), _test_assertion.line, _test_assertion.name, _test_assertion.expression, _test_assertion.message);
 }
 
 void _test_print_case_open() {
-    fprintf(stderr, "\033[1m‣ %s:%s:%s\033[0m\n", _test_run.name, _test_suite.name, _test_case.name);
+    fprintf(stderr, "[\033[1mTEST\033[0m] %s:%s:%s\033[0m\n", _test_run.name, _test_suite.name, _test_case.name);
 }
 
 void _test_print_case_pass() {
-    const char * format = "\033[1;32m‣ %s:%s:%s (%ld.%09lds)\033[0m\n";
+    const char * format = "[\033[0;32mPASS\033[0m] %s:%s:%s (%ld.%09lds)\033[0m\n";
     fprintf(stderr, format, _test_run.name, _test_suite.name, _test_case.name, _test_case.time.tv_sec, _test_case.time.tv_nsec);
 }
 
 void _test_print_case_fail() {
-    const char * format = "\033[1;31m‣ %s:%s:%s (%ld.%09lds)\033[0m\n";
-    fprintf(stderr, format, _test_run.name, _test_suite.name, _test_case.name, _test_case.time.tv_sec, _test_case.time.tv_nsec);
+    const char * format = "[\033[0;31mFAIL\033[0m] %s:%s:%s tested: \033[95m%d\033[0m passed: \033[0;32m%d\033[0m failed: \033[0;31m%d\033[0m (%ld.%09lds)\033[0m\n";
+    fprintf(stderr, format, _test_run.name, _test_suite.name, _test_case.name, _test_case.passed + _test_case.failed, _test_case.passed, _test_case.failed, _test_case.time.tv_sec, _test_case.time.tv_nsec);
+}
+
+void _test_print_run_close() {
+    const char * format = "[\033[1m====\033[0m] tested: \033[95m%d\033[0m passed: \033[0;32m%d\033[0m failed: \033[0;31m%d\033[0m\n";
+    fprintf(stderr, format, _test_run.tests, _test_run.tests - _test_run.failures, _test_run.failures);
 }
 
 void _test_print_case_close() {
     if(!_test_case.failed) {
         _test_print_case_pass();
-    } else {
-        _test_print_case_fail();
     }
-    fprintf(stderr, "\n");
 }
-
 
 // CUSTOMIZATION
 
@@ -306,7 +305,7 @@ void _test_print_case_close() {
 #define _TEST_SUITE_OPEN _test_report_suite_open();
 #define _TEST_SUITE_CLOSE _test_report_suite_close();
 #define _TEST_RUN_OPEN _test_report_open(); _test_report_run_open();
-#define _TEST_RUN_CLOSE _test_report_run_close(); _test_report_close();
+#define _TEST_RUN_CLOSE _test_report_run_close(); _test_report_close(); _test_print_run_close();
 #define _TEST_ASSERT_PASS 
 #define _TEST_ASSERT_FAIL _test_print_assert_fail();
 
@@ -333,11 +332,11 @@ void _test_case_(const char * name, void(*function)()) {
 
     _test_suite.time = _test_time_add(_test_suite.time, _test_case.time);
     _test_suite.errors -= 1;
-    _test_suite.failures += _test_case.failed;
+    _test_suite.failures += _test_case.failed > 0 ? 1 : 0;
 
     _test_run.time = _test_time_add(_test_run.time, _test_case.time);
     _test_run.errors -= 1;
-    _test_run.failures += _test_case.failed;
+    _test_run.failures += _test_case.failed > 0 ? 1 : 0;
 
     _TEST_CASE_CLOSE
 }
@@ -404,8 +403,59 @@ int _test_assert(int result) {
 #define TEST_SUITE(function) _test_suite_(#function, function)
 #define TEST_RUN(argc, argv, function) _test_run_(argc, argv, #function, function);
 
-#define TEST_ASSERT_MESSAGE(expression, ...) _TEST_ASSERT("TEST_ASSERT_MESSAGE", __FILE__, __LINE__, expression, __VA_ARGS__)
-#define TEST_EXPECT_MESSAGE(expression, ...) _TEST_EXPECT("TEST_ASSERT_MESSAGE", __FILE__, __LINE__, expression, __VA_ARGS__)
-#define TEST_ASSERT(expression) _TEST_ASSERT("TEST_ASSERT", __FILE__, __LINE__, expression, " ")
-#define TEST_EXPECT(expression) _TEST_EXPECT("TEST_EXPECT", __FILE__, __LINE__, expression, " ")
+// ASSERTIONS
+
+#define TEST_ASSERT_MESSAGE(expression, ...) _TEST_ASSERT("assert", __FILE__, __LINE__, expression, __VA_ARGS__)
+#define TEST_EXPECT_MESSAGE(expression, ...) _TEST_EXPECT("expect", __FILE__, __LINE__, expression, __VA_ARGS__)
+#define TEST_ASSERT(expression) TEST_ASSERT_MESSAGE(expression, "%d", expression)
+#define TEST_EXPECT(expression) TEST_EXPECT_MESSAGE(expression, "%d", expression)
+
+#define TEST_ASSERT_EQ_MESSAGE(a, b, ...) TEST_ASSERT_MESSAGE(a == b, __VA_ARGS__)
+#define TEST_ASSERT_NE_MESSAGE(a, b, ...) TEST_ASSERT_MESSAGE(a != b, __VA_ARGS__)
+#define TEST_ASSERT_GT_MESSAGE(a, b, ...) TEST_ASSERT_MESSAGE(a > b, __VA_ARGS__)
+#define TEST_ASSERT_GE_MESSAGE(a, b, ...) TEST_ASSERT_MESSAGE(a >= b, __VA_ARGS__)
+#define TEST_ASSERT_LT_MESSAGE(a, b, ...) TEST_ASSERT_MESSAGE(a < b, __VA_ARGS__)
+#define TEST_ASSERT_LE_MESSAGE(a, b, ...) TEST_ASSERT_MESSAGE(a <= b, __VA_ARGS__)
+
+#define TEST_ASSERT_EQ_INT(a, b) TEST_ASSERT_MESSAGE(a == b, "%d == %d", a, b)
+#define TEST_ASSERT_NE_INT(a, b) TEST_ASSERT_MESSAGE(a != b, "%d != %d", a, b)
+#define TEST_ASSERT_GT_INT(a, b) TEST_ASSERT_MESSAGE(a >  b, "%d >  %d", a, b)
+#define TEST_ASSERT_GE_INT(a, b) TEST_ASSERT_MESSAGE(a >= b, "%d >= %d", a, b)
+#define TEST_ASSERT_LT_INT(a, b) TEST_ASSERT_MESSAGE(a <  b, "%d <  %d", a, b)
+#define TEST_ASSERT_LE_INT(a, b) TEST_ASSERT_MESSAGE(a <= b, "%d <= %d", a, b)
+
+#define TEST_ASSERT_EQ_UINT(a, b) TEST_ASSERT_MESSAGE(a == b, "%u == %u", a, b)
+#define TEST_ASSERT_NE_UINT(a, b) TEST_ASSERT_MESSAGE(a != b, "%u != %u", a, b)
+#define TEST_ASSERT_GT_UINT(a, b) TEST_ASSERT_MESSAGE(a >  b, "%u > %u", a, b)
+#define TEST_ASSERT_GE_UINT(a, b) TEST_ASSERT_MESSAGE(a >= b, "%u >= %u", a, b)
+#define TEST_ASSERT_LT_UINT(a, b) TEST_ASSERT_MESSAGE(a <  b, "%u < %u", a, b)
+#define TEST_ASSERT_LE_UINT(a, b) TEST_ASSERT_MESSAGE(a <= b, "%u <= %u", a, b)
+
+#define TEST_ASSERT_EQ_FLOAT(a, b) TEST_ASSERT_MESSAGE(a == b, "%f == %f", a, b)
+#define TEST_ASSERT_NE_FLOAT(a, b) TEST_ASSERT_MESSAGE(a != b, "%f != %f", a, b)
+#define TEST_ASSERT_GT_FLOAT(a, b) TEST_ASSERT_MESSAGE(a >  b, "%f > %f", a, b)
+#define TEST_ASSERT_GE_FLOAT(a, b) TEST_ASSERT_MESSAGE(a >= b, "%f >= %f", a, b)
+#define TEST_ASSERT_LT_FLOAT(a, b) TEST_ASSERT_MESSAGE(a <  b, "%f < %f", a, b)
+#define TEST_ASSERT_LE_FLOAT(a, b) TEST_ASSERT_MESSAGE(a <= b, "%f <= %f", a, b)
+
+#define TEST_ASSERT_EQ_HEX(a, b) TEST_ASSERT_MESSAGE(a == b, "%x == %x", a, b)
+#define TEST_ASSERT_NE_HEX(a, b) TEST_ASSERT_MESSAGE(a != b, "%x != %x", a, b)
+#define TEST_ASSERT_GT_HEX(a, b) TEST_ASSERT_MESSAGE(a >  b, "%x > %x", a, b)
+#define TEST_ASSERT_GE_HEX(a, b) TEST_ASSERT_MESSAGE(a >= b, "%x >= %x", a, b)
+#define TEST_ASSERT_LT_HEX(a, b) TEST_ASSERT_MESSAGE(a <  b, "%x < %x", a, b)
+#define TEST_ASSERT_LE_HEX(a, b) TEST_ASSERT_MESSAGE(a <= b, "%x <= %x", a, b)
+
+#define TEST_ASSERT_EQ_CHAR(a, b) TEST_ASSERT_MESSAGE(a == b, "%c == %c", a, b)
+#define TEST_ASSERT_NE_CHAR(a, b) TEST_ASSERT_MESSAGE(a != b, "%c != %c", a, b)
+#define TEST_ASSERT_GT_CHAR(a, b) TEST_ASSERT_MESSAGE(a >  b, "%c > %c", a, b)
+#define TEST_ASSERT_GE_CHAR(a, b) TEST_ASSERT_MESSAGE(a >= b, "%c >= %c", a, b)
+#define TEST_ASSERT_LT_CHAR(a, b) TEST_ASSERT_MESSAGE(a <  b, "%c < %c", a, b)
+#define TEST_ASSERT_LE_CHAR(a, b) TEST_ASSERT_MESSAGE(a <= b, "%c <= %c", a, b)
+
+#define TEST_ASSERT_EQ_STRING(a, b) TEST_ASSERT_MESSAGE(strcmp(a, b) == 0, "\"%s\" == \"%s\"", a, b)
+#define TEST_ASSERT_NE_STRING(a, b) TEST_ASSERT_MESSAGE(strcmp(a, b) != 0, "\"%s\" != \"%s\"", a, b)
+
+#define TEST_ASSERT_EQ_BYTES(a, b, size) TEST_ASSERT_MESSAGE(memcmp(a, b) == 0, "\"%s\" == \"%s\"", a, b)
+#define TEST_ASSERT_NE_BYTES(a, b, size) TEST_ASSERT_MESSAGE(strcmp(a, b) == 0, "\"%s\" == \"%s\"", a, b)
+
 #endif /* STATIC_TEST_H */
