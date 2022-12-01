@@ -1,26 +1,27 @@
-# 🪨 static
-Single-file, header-only, dependency-free libraries for testing, logging, tracing and terminal interaction in C.
+# 🔋 static
+Dead-imple, single-file, header-only, dependency-free libraries for testing, logging, tracing and terminal interaction in C.
 
 |Library|LOC|Tests|Coverage|Result|
 |-|-|-|-|-|
-|[test.h](#testh)|403||||
-|[log.h](#logh)|116||||
+|[test.h](#testh)|||||
+|[log.h](#logh)|||||
 |trace.h|||||
 |terminal.h|||||
 
 ## Features
-* blazing fast compile times
-* static memory footprint, no dynamic allocations
-* compile time configuration & customization
-* concise code for easy review/audit and modification
-* standard C99 using no extensions
-* no warnings on clang, gcc and msvc
+- [x] blazing fast compile times
+- [x] static memory footprint, no dynamic allocations
+- [x] compile time configuration & customization
+- [x] concise code for easy review/audit and modification
+- [x] standard C99 and C11 using no extensions
+- [x] no warnings on clang, gcc and msvc
 
 ### [test.h](static/test.h)
-* JUnit XML report generation
+* implements [xUnit](https://en.wikipedia.org/wiki/XUnit) framework structure
+* [JUnit XML](https://github.com/junit-team/junit5/blob/main/platform-tests/src/test/resources/jenkins-junit.xsd) report generation
 * colored command line output
-* xUnit structure (run-suite-case)
-* behavior testing (given-when-then)
+* xUnit structure testing (run-suite-case)
+* gherkin/behavior testing (given-when-then)
 * <500 LOC
 
 ### [log.h](static/log.h)
