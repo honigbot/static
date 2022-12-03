@@ -11,12 +11,12 @@ Dead-simple, single-file, header-only, dependency-free libraries for **testing**
 
 |[test.h](static/test.h)|[log.h](static/log.h)|trace.h|terminal.h|
 |-|-|-|-|
-|✅ [xUnit](https://en.wikipedia.org/wiki/XUnit) framework structure||||
-|✅ [JUnit](https://github.com/junit-team/junit5/blob/main/platform-tests/src/test/resources/jenkins-junit.xsd) report generation||||
-|✅ colored command line output||||
-|✅ run-suite-case testing||||
-|✅ gherkin/behavior testing||||
-|✅ <500 LOC||||
+|✅ &nbsp; [xUnit](https://en.wikipedia.org/wiki/XUnit) framework structure||||
+|✅ &nbsp; [JUnit](https://github.com/junit-team/junit5/blob/main/platform-tests/src/test/resources/jenkins-junit.xsd) report generation||||
+|✅ &nbsp; colored command line output||||
+|✅ &nbsp; run-suite-case testing||||
+|✅ &nbsp; gherkin/behavior testing||||
+|✅ &nbsp; <500 LOC||||
 
 |Library|LOC|Tests|Coverage|Result|
 |-|-|-|-|-|
