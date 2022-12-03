@@ -1,7 +1,6 @@
 # 🔋 static
-Dead-simple, single-file, header-only, dependency-free libraries for testing, logging, tracing and terminal interaction in C.
+Dead-simple, single-file, header-only, dependency-free libraries for **testing**, **logging**, **tracing** and **terminal** interaction in **C**. 
 
-## Features
 - [x] blazing fast compile times
 - [x] static memory footprint, no dynamic allocations
 - [x] compile time configuration & customization
@@ -21,7 +20,7 @@ Dead-simple, single-file, header-only, dependency-free libraries for testing, lo
 
 |Library|LOC|Tests|Coverage|Result|
 |-|-|-|-|-|
-|[test.h](#testh)|||||
-|[log.h](#logh)|||||
+|**[test.h](static/test.h)**|||||
+|**[log.h](static/log.h)**|||||
 |trace.h|||||
 |terminal.h|||||
