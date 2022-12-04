@@ -1,4 +1,5 @@
 # 🔋 static
+
 Dead-simple, single-file, header-only, dependency-free libraries for **testing**, **logging**, **tracing** and **terminal** interaction in **C**. 
 
 - [x] blazing fast compile times
@@ -17,10 +18,3 @@ Dead-simple, single-file, header-only, dependency-free libraries for **testing**
 |✅ &nbsp; run-suite-case testing||||
 |✅ &nbsp; gherkin/behavior testing||||
 |✅ &nbsp; <500 LOC||||
-
-|Library|LOC|Tests|Coverage|Result|
-|-|-|-|-|-|
-|**[test.h](static/test.h)**|||||
-|**[log.h](static/log.h)**|||||
-|trace.h|||||
-|terminal.h|||||
