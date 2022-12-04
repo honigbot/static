@@ -32,8 +32,12 @@ struct {
 
 struct {
     const char * name;
+    const char * when;
+    const char * then;
     struct timespec timestamp;
     struct timespec time;
+    int when_index;
+    int scenario_index;
     int failed;
     int error;
     int passed;
@@ -101,6 +105,10 @@ struct timespec _test_time_zero() {
     zero.tv_sec = 0;
     zero.tv_nsec = 0;
     return zero;
+}
+
+double _test_time_double(struct timespec time) {
+    return time.tv_sec + time.tv_nsec / 1000000000.0;
 }
 
 const char * _test_file_name(const char * path) {
@@ -217,8 +225,6 @@ void _test_report_fprintf_xml(const char * string) {
 
 void _test_report_case_format_failure() {
     fprintf(_test_report.file, "            <failure message=\"%s:%d: ", _test_file_name(_test_assertion.file), _test_assertion.line);
-    _test_report_fprintf_xml(_test_assertion.expression); 
-    fprintf(_test_report.file, " ");
     _test_report_fprintf_xml(_test_assertion.message);
     fprintf(_test_report.file, "\" type=\"%s\">\n            </failure>\n", _test_assertion.name);
 }
@@ -269,32 +275,42 @@ void _test_report_case_close() {
 // PRINT
 
 void _test_print_assert_fail() {
-    const char * format = "[\033[0;31mFAIL\033[0m] %s:%s:%s %s:%d: %s: %s (%s)\033[0m\n";    
-    fprintf(stderr, format, _test_run.name, _test_suite.name, _test_case.name, _test_file_name(_test_assertion.file), _test_assertion.line, _test_assertion.name, _test_assertion.expression, _test_assertion.message);
+    if(_test_case.when == NULL) {
+        const char * format = "[\033[1;31mFAIL\033[0m] %s:%s:%s %s:%d: %s %s\033[0m\n";    
+        fprintf(stderr, format, _test_run.name, _test_suite.name, _test_case.name, _test_file_name(_test_assertion.file), _test_assertion.line, _test_assertion.name, _test_assertion.message);
+    } else if(_test_case.then == NULL) {
+        const char * format = "[\033[1;31mFAIL\033[0m] %s:%s:%s %s:%d: when %s: %s %s\033[0m\n";
+        fprintf(stderr, format, _test_run.name, _test_suite.name, _test_case.name, _test_file_name(_test_assertion.file), _test_assertion.line, _test_case.when, _test_assertion.name, _test_assertion.message);
+    } else {
+        const char * format = "[\033[1;31mFAIL\033[0m] %s:%s:%s %s:%d: when %s then %s: %s %s\033[0m\n";
+        fprintf(stderr, format, _test_run.name, _test_suite.name, _test_case.name, _test_file_name(_test_assertion.file), _test_assertion.line, _test_case.when, _test_case.then, _test_assertion.name, _test_assertion.message);
+    }
 }
 
 void _test_print_case_open() {
-    fprintf(stderr, "[\033[1mTEST\033[0m] %s:%s:%s\033[0m\n", _test_run.name, _test_suite.name, _test_case.name);
+    fprintf(stderr, "[\033[1;97mTEST\033[0m] %s:%s:%s\n", _test_run.name, _test_suite.name, _test_case.name);
 }
 
 void _test_print_case_pass() {
-    const char * format = "[\033[0;32mPASS\033[0m] %s:%s:%s (%ld.%09lds)\033[0m\n";
-    fprintf(stderr, format, _test_run.name, _test_suite.name, _test_case.name, _test_case.time.tv_sec, _test_case.time.tv_nsec);
+    const char * format = "[\033[1;32mPASS\033[0m] %s:%s:%s (%fs)\n";
+    fprintf(stderr, format, _test_run.name, _test_suite.name, _test_case.name, _test_time_double(_test_case.time));
 }
 
 void _test_print_case_fail() {
-    const char * format = "[\033[0;31mFAIL\033[0m] %s:%s:%s tested: \033[95m%d\033[0m passed: \033[0;32m%d\033[0m failed: \033[0;31m%d\033[0m (%ld.%09lds)\033[0m\n";
-    fprintf(stderr, format, _test_run.name, _test_suite.name, _test_case.name, _test_case.passed + _test_case.failed, _test_case.passed, _test_case.failed, _test_case.time.tv_sec, _test_case.time.tv_nsec);
+    const char * format = "[\033[1;31mFAIL\033[0m] %s:%s:%s (%ld.%09lds)\033[0m\n";
+    fprintf(stderr, format, _test_run.name, _test_suite.name, _test_case.name, _test_case.time.tv_sec, _test_case.time.tv_nsec);
 }
 
 void _test_print_run_close() {
-    const char * format = "[\033[1m====\033[0m] tested: \033[95m%d\033[0m passed: \033[0;32m%d\033[0m failed: \033[0;31m%d\033[0m\n";
+    const char * format = "[\033[1m====\033[0m] tested: \033[1;95m%d\033[0m passed: \033[1;32m%d\033[0m failed: \033[1;31m%d\033[0m\n";
     fprintf(stderr, format, _test_run.tests, _test_run.tests - _test_run.failures, _test_run.failures);
 }
 
 void _test_print_case_close() {
     if(!_test_case.failed) {
         _test_print_case_pass();
+    } else {
+        // _test_print_case_fail();
     }
 }
 
@@ -313,6 +329,7 @@ void _test_case_(const char * name, void(*function)()) {
     _test_case.name = name; 
     _test_case.timestamp = _test_time_now(); 
     _test_case.time = _test_time_zero();
+    _test_case.scenario_index = 0;
     _test_case.error = 1;
     _test_case.failed = 0; 
     _test_case.passed = 0;
@@ -325,7 +342,13 @@ void _test_case_(const char * name, void(*function)()) {
 
     _TEST_CASE_OPEN
 
-    function();
+    do {
+        _test_case.when = 0;
+        _test_case.then = 0;
+        _test_case.when_index = 0;
+        function();
+        _test_case.scenario_index += 1;
+    } while(_test_case.scenario_index < _test_case.when_index);
 
     _test_case.error = 0;
     _test_case.time = _test_time_sub(_test_time_now(), _test_case.timestamp);
@@ -399,16 +422,22 @@ int _test_assert(int result) {
     snprintf(_test_assertion.message, sizeof(_test_assertion.message), __VA_ARGS__); \
     _test_assert(_expression);
 
-#define TEST_CASE(function) _test_case_(#function, function)
-#define TEST_SUITE(function) _test_suite_(#function, function)
 #define TEST_RUN(argc, argv, function) _test_run_(argc, argv, #function, function);
+#define TEST_SUITE(function) _test_suite_(#function, function)
+#define TEST_CASE(function) _test_case_(#function, function)
+#define TEST_SCENARIO(function) TEST_CASE(function)
+#define TEST_WHEN(message) \
+    _test_case.when = message; \
+    if(_test_case.scenario_index == _test_case.when_index++)
+#define TEST_THEN(message) \
+    _test_case.then = message;  
 
 // ASSERTIONS
 
 #define TEST_ASSERT_MESSAGE(expression, ...) _TEST_ASSERT("assert", __FILE__, __LINE__, expression, __VA_ARGS__)
 #define TEST_EXPECT_MESSAGE(expression, ...) _TEST_EXPECT("expect", __FILE__, __LINE__, expression, __VA_ARGS__)
-#define TEST_ASSERT(expression) TEST_ASSERT_MESSAGE(expression, "%d", expression)
-#define TEST_EXPECT(expression) TEST_EXPECT_MESSAGE(expression, "%d", expression)
+#define TEST_ASSERT(expression) TEST_ASSERT_MESSAGE(expression, #expression" (%d)", expression)
+#define TEST_EXPECT(expression) TEST_EXPECT_MESSAGE(expression, #expression" (%d)", expression)
 
 #define TEST_ASSERT_EQ_MESSAGE(a, b, ...) TEST_ASSERT_MESSAGE(a == b, __VA_ARGS__)
 #define TEST_ASSERT_NE_MESSAGE(a, b, ...) TEST_ASSERT_MESSAGE(a != b, __VA_ARGS__)
@@ -417,40 +446,45 @@ int _test_assert(int result) {
 #define TEST_ASSERT_LT_MESSAGE(a, b, ...) TEST_ASSERT_MESSAGE(a < b, __VA_ARGS__)
 #define TEST_ASSERT_LE_MESSAGE(a, b, ...) TEST_ASSERT_MESSAGE(a <= b, __VA_ARGS__)
 
-#define TEST_ASSERT_EQ_INT(a, b) TEST_ASSERT_MESSAGE(a == b, "%d == %d", a, b)
-#define TEST_ASSERT_NE_INT(a, b) TEST_ASSERT_MESSAGE(a != b, "%d != %d", a, b)
-#define TEST_ASSERT_GT_INT(a, b) TEST_ASSERT_MESSAGE(a >  b, "%d >  %d", a, b)
-#define TEST_ASSERT_GE_INT(a, b) TEST_ASSERT_MESSAGE(a >= b, "%d >= %d", a, b)
-#define TEST_ASSERT_LT_INT(a, b) TEST_ASSERT_MESSAGE(a <  b, "%d <  %d", a, b)
-#define TEST_ASSERT_LE_INT(a, b) TEST_ASSERT_MESSAGE(a <= b, "%d <= %d", a, b)
+#define TEST_ASSERT_OP_TYPE(a, op, b, format) TEST_ASSERT_MESSAGE(a op b, #a" "#op" "#b" ("format" "#op" "format")", a, b)
 
-#define TEST_ASSERT_EQ_UINT(a, b) TEST_ASSERT_MESSAGE(a == b, "%u == %u", a, b)
-#define TEST_ASSERT_NE_UINT(a, b) TEST_ASSERT_MESSAGE(a != b, "%u != %u", a, b)
-#define TEST_ASSERT_GT_UINT(a, b) TEST_ASSERT_MESSAGE(a >  b, "%u > %u", a, b)
-#define TEST_ASSERT_GE_UINT(a, b) TEST_ASSERT_MESSAGE(a >= b, "%u >= %u", a, b)
-#define TEST_ASSERT_LT_UINT(a, b) TEST_ASSERT_MESSAGE(a <  b, "%u < %u", a, b)
-#define TEST_ASSERT_LE_UINT(a, b) TEST_ASSERT_MESSAGE(a <= b, "%u <= %u", a, b)
+#define TEST_ASSERT_EQ_INT(a, b) TEST_ASSERT_OP_TYPE(a, ==, b, "%d")
+#define TEST_ASSERT_NE_INT(a, b) TEST_ASSERT_OP_TYPE(a, !=, b, "%d")
+#define TEST_ASSERT_GE_INT(a, b) TEST_ASSERT_OP_TYPE(a, >=, b, "%d")
+#define TEST_ASSERT_LE_INT(a, b) TEST_ASSERT_OP_TYPE(a, <=, b, "%d")
+#define TEST_ASSERT_GT_INT(a, b) TEST_ASSERT_OP_TYPE(a, >, b, "%d")
+#define TEST_ASSERT_LT_INT(a, b) TEST_ASSERT_OP_TYPE(a, <, b, "%d")
 
-#define TEST_ASSERT_EQ_FLOAT(a, b) TEST_ASSERT_MESSAGE(a == b, "%f == %f", a, b)
-#define TEST_ASSERT_NE_FLOAT(a, b) TEST_ASSERT_MESSAGE(a != b, "%f != %f", a, b)
-#define TEST_ASSERT_GT_FLOAT(a, b) TEST_ASSERT_MESSAGE(a >  b, "%f > %f", a, b)
-#define TEST_ASSERT_GE_FLOAT(a, b) TEST_ASSERT_MESSAGE(a >= b, "%f >= %f", a, b)
-#define TEST_ASSERT_LT_FLOAT(a, b) TEST_ASSERT_MESSAGE(a <  b, "%f < %f", a, b)
-#define TEST_ASSERT_LE_FLOAT(a, b) TEST_ASSERT_MESSAGE(a <= b, "%f <= %f", a, b)
+#define TEST_ASSERT_EQ_UINT(a, b) TEST_ASSERT_OP_TYPE(a, ==, b, "%u")
+#define TEST_ASSERT_NE_UINT(a, b) TEST_ASSERT_OP_TYPE(a, !=, b, "%u")
+#define TEST_ASSERT_GE_UINT(a, b) TEST_ASSERT_OP_TYPE(a, >=, b, "%u")
+#define TEST_ASSERT_LE_UINT(a, b) TEST_ASSERT_OP_TYPE(a, <=, b, "%u")
+#define TEST_ASSERT_GT_UINT(a, b) TEST_ASSERT_OP_TYPE(a, >,  b, "%u")
+#define TEST_ASSERT_LT_UINT(a, b) TEST_ASSERT_OP_TYPE(a, <,  b, "%u")
 
-#define TEST_ASSERT_EQ_HEX(a, b) TEST_ASSERT_MESSAGE(a == b, "%x == %x", a, b)
-#define TEST_ASSERT_NE_HEX(a, b) TEST_ASSERT_MESSAGE(a != b, "%x != %x", a, b)
-#define TEST_ASSERT_GT_HEX(a, b) TEST_ASSERT_MESSAGE(a >  b, "%x > %x", a, b)
-#define TEST_ASSERT_GE_HEX(a, b) TEST_ASSERT_MESSAGE(a >= b, "%x >= %x", a, b)
-#define TEST_ASSERT_LT_HEX(a, b) TEST_ASSERT_MESSAGE(a <  b, "%x < %x", a, b)
-#define TEST_ASSERT_LE_HEX(a, b) TEST_ASSERT_MESSAGE(a <= b, "%x <= %x", a, b)
+#define TEST_ASSERT_EQ_FLOAT(a, b) TEST_ASSERT_OP_TYPE(a, ==, b, "%f")
+#define TEST_ASSERT_NE_FLOAT(a, b) TEST_ASSERT_OP_TYPE(a, !=, b, "%f")
+#define TEST_ASSERT_GE_FLOAT(a, b) TEST_ASSERT_OP_TYPE(a, >=, b, "%f")
+#define TEST_ASSERT_LE_FLOAT(a, b) TEST_ASSERT_OP_TYPE(a, <=, b, "%f")
+#define TEST_ASSERT_GT_FLOAT(a, b) TEST_ASSERT_OP_TYPE(a, >,  b, "%f")
+#define TEST_ASSERT_LT_FLOAT(a, b) TEST_ASSERT_OP_TYPE(a, <,  b, "%f")
 
-#define TEST_ASSERT_EQ_CHAR(a, b) TEST_ASSERT_MESSAGE(a == b, "%c == %c", a, b)
-#define TEST_ASSERT_NE_CHAR(a, b) TEST_ASSERT_MESSAGE(a != b, "%c != %c", a, b)
-#define TEST_ASSERT_GT_CHAR(a, b) TEST_ASSERT_MESSAGE(a >  b, "%c > %c", a, b)
-#define TEST_ASSERT_GE_CHAR(a, b) TEST_ASSERT_MESSAGE(a >= b, "%c >= %c", a, b)
-#define TEST_ASSERT_LT_CHAR(a, b) TEST_ASSERT_MESSAGE(a <  b, "%c < %c", a, b)
-#define TEST_ASSERT_LE_CHAR(a, b) TEST_ASSERT_MESSAGE(a <= b, "%c <= %c", a, b)
+#define TEST_ASSERT_EQ_HEX(a, b) TEST_ASSERT_OP_TYPE(a, ==, b, "%x")
+#define TEST_ASSERT_NE_HEX(a, b) TEST_ASSERT_OP_TYPE(a, !=, b, "%x")
+#define TEST_ASSERT_GE_HEX(a, b) TEST_ASSERT_OP_TYPE(a, >=, b, "%x")
+#define TEST_ASSERT_LE_HEX(a, b) TEST_ASSERT_OP_TYPE(a, <=, b, "%x")
+#define TEST_ASSERT_GT_HEX(a, b) TEST_ASSERT_OP_TYPE(a, >,  b, "%x")
+#define TEST_ASSERT_LT_HEX(a, b) TEST_ASSERT_OP_TYPE(a, <,  b, "%x")
+
+#define TEST_ASSERT_EQ_CHAR(a, b) TEST_ASSERT_OP_TYPE(a, ==, b, "%c")
+#define TEST_ASSERT_NE_CHAR(a, b) TEST_ASSERT_OP_TYPE(a, !=, b, "%c")
+#define TEST_ASSERT_GT_CHAR(a, b) TEST_ASSERT_OP_TYPE(a, >=, b, "%c")
+#define TEST_ASSERT_GE_CHAR(a, b) TEST_ASSERT_OP_TYPE(a, <=, b, "%c")
+#define TEST_ASSERT_LT_CHAR(a, b) TEST_ASSERT_OP_TYPE(a, >,  b, "%c")
+#define TEST_ASSERT_LE_CHAR(a, b) TEST_ASSERT_OP_TYPE(a, <,  b, "%c")
+
+#define TEST_ASSERT_ALL_NE_INT(array, size, expected) 
+
 
 #define TEST_ASSERT_EQ_STRING(a, b) TEST_ASSERT_MESSAGE(strcmp(a, b) == 0, "\"%s\" == \"%s\"", a, b)
 #define TEST_ASSERT_NE_STRING(a, b) TEST_ASSERT_MESSAGE(strcmp(a, b) != 0, "\"%s\" != \"%s\"", a, b)
