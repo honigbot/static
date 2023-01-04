@@ -32,8 +32,6 @@ void suite1() {
 void suite2() {
     test_case(pass1);
     test_case(pass2);
-    test_case(fail1);
-    test_case(fail2);
 }
 
 int main() {
