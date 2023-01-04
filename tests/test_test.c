@@ -1,4 +1,4 @@
-#include "static/test2.h"
+#include "static/test.h"
 
 void pass1() {
     test_assert(1);
