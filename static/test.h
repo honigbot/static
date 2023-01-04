@@ -10,8 +10,8 @@
 
 #define _TEST_UNUSED(x) (void)(1+x)
 
-#ifndef TEST_REPORT
-    #define TEST_REPORT "report.xml"
+#ifndef TEST_REPORT_XML
+    #define TEST_REPORT_XML "report.xml"
 #endif
 
 #ifndef TEST_HOSTNAME_LENGTH
@@ -22,55 +22,40 @@
     #define TEST_MESSAGE_LENGTH 512
 #endif
 
-struct {
-    const char * name;
-    const char * expression;
-    const char * file;
-    int line;
-    char message[TEST_MESSAGE_LENGTH];
-} _test_assertion;
+const char * _test_assert_name = NULL;
+const char * _test_assert_expression = NULL;
+const char * _test_assert_file = NULL;
+int _test_assert_line = 0;
+char _test_assert_message[TEST_MESSAGE_LENGTH];
 
-struct {
-    const char * name;
-    const char * when;
-    const char * then;
-    struct timespec timestamp;
-    struct timespec time;
-    int when_index;
-    int scenario_index;
-    int failed;
-    int error;
-    int passed;
-    int status;
-} _test_case;
+const char * _test_case_name = NULL;
+struct timespec _test_case_timestamp = { 0, 0 }; 
+struct timespec _test_case_time = { 0, 0 }; 
+int _test_case_error = 0;
+int _test_case_failed = 0;
+int _test_case_passed = 0;
 
-struct {
-    const char * name;
-    struct timespec timestamp;
-    struct timespec time;
-    int tests;
-    int failures;
-    int errors;
-} _test_suite;
+const char * _test_suite_name = NULL;
+struct timespec _test_suite_timestamp = { 0, 0 }; 
+struct timespec _test_suite_time = { 0, 0 }; 
+int _test_suite_tests = 0;
+int _test_suite_errors = 0;
+int _test_suite_failures = 0;
 
-struct {
-    const char * name;
-    struct timespec timestamp;
-    struct timespec time;
-    int tests;
-    int failures;
-    int errors;
-} _test_run;
+struct timespec _test_run_timestamp = { 0, 0 }; 
+struct timespec _test_run_time = { 0, 0 };
+int _test_run_tests = 0;
+int _test_run_failures = 0;
+int _test_run_errors = 0;
 
-struct {
-    int case_open;
-    int case_close;
-    int suite_open;
-    int suite_close;
-    int run_open;
-    int run_close;
-    FILE * file;
-} _test_report;
+int _test_xml_case_open_position = 0;
+int _test_xml_case_close_position = 0;
+int _test_xml_suite_open_position = 0;
+int _test_xml_suite_close_position = 0;
+int _test_xml_run_open_position = 0;
+int _test_xml_run_close_position = 0;
+char _test_xml_hostname[TEST_HOSTNAME_LENGTH];
+FILE * _test_xml_file = NULL;
 
 struct timespec _test_time_now() {
     struct timespec t;    
@@ -116,7 +101,7 @@ const char * _test_file_name(const char * path) {
     return last_slash ? last_slash + 1 : path;
 }
 
-// REPORT
+// XML
 
 #define _TEST_PREFIX_LENGTH sizeof("<?xml version=\"1.0\" encoding=\"UTF-8\"?>")
 #define _TEST_TESTS_LENGTH sizeof("tests=\"4294967295\"")
@@ -124,372 +109,356 @@ const char * _test_file_name(const char * path) {
 #define _TEST_ERRORS_LENGTH sizeof("errors=\"4294967295\"")
 #define _TEST_TIME_LENGTH sizeof("time=\"4294967295.999999999\"")
 #define _TEST_TIMESTAMP_LENGTH sizeof("timestamp=\"YYYY-MM-DDThh:mm:ssZ\"")
-#define _TEST_HOSTNAME_LENGTH sizeof("hostname=\"\"") + TEST_HOSTNAME_LENGTH
-#define _TEST_TESTSUITES_LENGTH (sizeof("<testsuites name=\"\">") + _TEST_TESTS_LENGTH + _TEST_FAILURES_LENGTH + _TEST_ERRORS_LENGTH + _TEST_TIME_LENGTH)
+#define _TEST_HOSTNAME_LENGTH sizeof("hostname=\"\"")
+#define _TEST_TESTSUITES_LENGTH (sizeof("<testsuites>") + _TEST_TESTS_LENGTH + _TEST_FAILURES_LENGTH + _TEST_ERRORS_LENGTH + _TEST_TIME_LENGTH)
 #define _TEST_TESTSUITE_LENGTH (sizeof("    <testsuite name=\"\">") + _TEST_TESTS_LENGTH + _TEST_FAILURES_LENGTH + _TEST_ERRORS_LENGTH + _TEST_HOSTNAME_LENGTH + _TEST_TIME_LENGTH + _TEST_TIMESTAMP_LENGTH)
 #define _TEST_TESTCASE_LENGTH (sizeof("        <testcase name=\"\">") + _TEST_TIME_LENGTH)
 
-void _test_report_format() {
+void _test_xml_open() {
+    gethostname(_test_xml_hostname, sizeof(_test_xml_hostname));
+    _test_xml_file = fopen(TEST_REPORT_XML, "w");
     const char * format = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
-    fprintf(_test_report.file, "%s", format);
+    fprintf(_test_xml_file, "%s", format);
+    _test_xml_run_open_position = ftell(_test_xml_file);
 }
 
-void _test_report_open() {
-    _test_report.file = fopen(TEST_REPORT, "w");
-    _test_report_format();
-    _test_report.run_open = ftell(_test_report.file);
+void _test_xml_close() {
+    fclose(_test_xml_file);
 }
 
-void _test_report_close() {
-    fclose(_test_report.file);
+void _test_xml_run_format_open() {
+    const char * format = "<testsuites tests=\"%d\" failures=\"%d\" errors=\"%d\" time=\"%ld.%09ld\">";
+    int maximum_length = _TEST_TESTSUITES_LENGTH;
+    int written_length = fprintf(_test_xml_file, format, _test_run_tests, _test_run_failures, _test_run_errors, _test_run_time.tv_sec, _test_run_time.tv_nsec);
+    fprintf(_test_xml_file, "%*s\n", maximum_length-written_length, "");
 }
 
-void _test_report_run_format_open() {
-    const char * format = "<testsuites name=\"%s\" tests=\"%d\" failures=\"%d\" errors=\"%d\" time=\"%ld.%09ld\">";
-    int maximum_length = _TEST_PREFIX_LENGTH + _TEST_TESTSUITES_LENGTH + strlen(_test_run.name);
-    int written_length = fprintf(_test_report.file, format, _test_run.name, _test_run.tests, _test_run.failures, _test_run.errors, _test_run.time.tv_sec, _test_run.time.tv_nsec);
-    fprintf(_test_report.file, "%*s\n", maximum_length-written_length, "");
+void _test_xml_run_format_close() {
+    fprintf(_test_xml_file, "</testsuites>");
+    _TEST_UNUSED(ftruncate(fileno(_test_xml_file), ftell(_test_xml_file)));
 }
 
-void _test_report_run_format_close() {
-    fprintf(_test_report.file, "</testsuites>");
-    _TEST_UNUSED(ftruncate(fileno(_test_report.file), ftell(_test_report.file)));
+void _test_xml_run_update() {
+    fseek(_test_xml_file, _test_xml_run_open_position, 0);
+    _test_xml_run_format_open();
 }
 
-void _test_report_run_update() {
-    fseek(_test_report.file, _test_report.run_open, 0);
-    _test_report_run_format_open();
+void _test_xml_run_open() {
+    _test_xml_run_update();
+    _test_xml_run_close_position = ftell(_test_xml_file);
 }
 
-void _test_report_run_open() {
-    _test_report_run_update();
-    _test_report.run_close = ftell(_test_report.file);
+void _test_xml_run_close() {
+    fseek(_test_xml_file, _test_xml_run_close_position, 0);
+    _test_xml_run_format_close();
+    _test_xml_run_open_position = ftell(_test_xml_file);
 }
 
-void _test_report_run_close() {
-    fseek(_test_report.file, _test_report.run_close, 0);
-    _test_report_run_format_close();
-    _test_report.run_open = ftell(_test_report.file);
-}
-
-void _test_report_suite_format_open() {
+void _test_xml_suite_format_open() {
     const char * format = "    <testsuite name=\"%s\" tests=\"%d\" failures=\"%d\" errors=\"%d\" hostname=\"%s\" time=\"%ld.%09ld\" timestamp=\"%s\">";
     char timestamp_string[sizeof("YYYY-MM-DDThh:mm:ssZ")];
-    strftime(timestamp_string, sizeof(timestamp_string), "%FT%TZ", gmtime(&_test_suite.timestamp.tv_sec));
-    char hostname_string[TEST_HOSTNAME_LENGTH];
-    gethostname(hostname_string,  sizeof(hostname_string));
-    int maximum_length = _TEST_TESTSUITE_LENGTH + strlen(_test_suite.name);
-    int written_length = fprintf(_test_report.file, format, _test_suite.name, _test_suite.tests, _test_suite.failures, _test_suite.errors, hostname_string, _test_suite.time.tv_sec, _test_suite.time.tv_nsec, timestamp_string);
-    fprintf(_test_report.file, "%*s\n", maximum_length-written_length, "");
+    strftime(timestamp_string, sizeof(timestamp_string), "%FT%TZ", gmtime(&_test_suite_timestamp.tv_sec));
+    int maximum_length = _TEST_TESTSUITE_LENGTH + strlen(_test_suite_name) + strlen(_test_xml_hostname);
+    int written_length = fprintf(_test_xml_file, format, _test_suite_name, _test_suite_tests, _test_suite_failures, _test_suite_errors, _test_xml_hostname, _test_suite_time.tv_sec, _test_suite_time.tv_nsec, timestamp_string);
+    fprintf(_test_xml_file, "%*s\n", maximum_length-written_length, "");
 }
 
-void _test_report_suite_format_close() {
-    fprintf(_test_report.file, "    </testsuite>\n");
+void _test_xml_suite_format_close() {
+    fprintf(_test_xml_file, "    </testsuite>\n");
 }
 
-void _test_report_suite_update() {
-    fseek(_test_report.file, _test_report.suite_open, 0);
-    _test_report_suite_format_open();
+void _test_xml_suite_update() {
+    fseek(_test_xml_file, _test_xml_suite_open_position, 0);
+    _test_xml_suite_format_open();
 }
 
-void _test_report_suite_open() {
-    _test_report.suite_open = _test_report.run_close;
-    _test_report_suite_update();
-    _test_report.suite_close = ftell(_test_report.file);
+void _test_xml_suite_open() {
+    _test_xml_suite_open_position = _test_xml_run_close_position;
+    _test_xml_suite_update();
+    _test_xml_suite_close_position = ftell(_test_xml_file);
 }
 
-void _test_report_suite_close() {
-    fseek(_test_report.file, _test_report.suite_close, 0);
-    _test_report_suite_format_close();
-    _test_report.run_close = ftell(_test_report.file);
+void _test_xml_suite_close() {
+    fseek(_test_xml_file, _test_xml_suite_close_position, 0);
+    _test_xml_suite_format_close();
+    _test_xml_run_close_position = ftell(_test_xml_file);
 }
 
-void _test_report_fprintf_xml(const char * string) {
+void _test_xml_fprintf_xml(const char * string) {
     for(const char * s = string; *s; ) {
         int length = strlen(s);
         int next_replace = strcspn(s, "\"\'<>&");
-        fprintf(_test_report.file, "%.*s", next_replace, s);
+        fprintf(_test_xml_file, "%.*s", next_replace, s);
         if(next_replace >= length) return;
 
         switch(s[next_replace]) {
-            case '\"': fprintf(_test_report.file, "&quot;"); break;
-            case '\'': fprintf(_test_report.file, "&apos;"); break;
-            case '<': fprintf(_test_report.file, "&lt;"); break;
-            case '>': fprintf(_test_report.file, "&gt;"); break;
-            case '&': fprintf(_test_report.file, "&amp;"); break;
+            case '\"': fprintf(_test_xml_file, "&quot;"); break;
+            case '\'': fprintf(_test_xml_file, "&apos;"); break;
+            case '<':  fprintf(_test_xml_file, "&lt;"); break;
+            case '>':  fprintf(_test_xml_file, "&gt;"); break;
+            case '&':  fprintf(_test_xml_file, "&amp;"); break;
             default: break;
         }
         s += next_replace+1;
     }
 }
 
-void _test_report_case_format_failure() {
-    fprintf(_test_report.file, "            <failure message=\"%s:%d: ", _test_file_name(_test_assertion.file), _test_assertion.line);
-    _test_report_fprintf_xml(_test_assertion.message);
-    fprintf(_test_report.file, "\" type=\"%s\">\n            </failure>\n", _test_assertion.name);
+void _test_xml_case_format_failure() {
+    fprintf(_test_xml_file, "            <failure message=\"%s:%d: ", _test_file_name(_test_assert_file), _test_assert_line);
+    _test_xml_fprintf_xml(_test_assert_message);
+    fprintf(_test_xml_file, "\" type=\"%s\">\n            </failure>\n", _test_assert_name);
 }
 
-void _test_report_case_format_error() {
-    fprintf(_test_report.file, "%s\n", "            <error message=\"unknown\" type=\"unknown\">\n            </error>");
+void _test_xml_case_format_error() {
+    fprintf(_test_xml_file, "%s\n", "            <error message=\"unknown\" type=\"unknown\">\n            </error>");
 }
 
-void _test_report_case_format_open() {
+void _test_xml_case_format_open() {
     const char * format = "        <testcase name=\"%s\" time=\"%ld.%09ld\">";
-    int maximum_length = _TEST_TESTCASE_LENGTH + strlen(_test_case.name);
-    int written_length = fprintf(_test_report.file, format, _test_case.name, _test_case.time.tv_sec, _test_case.time.tv_nsec);
-    fprintf(_test_report.file, "%*s\n", maximum_length-written_length, "");
+    int maximum_length = _TEST_TESTCASE_LENGTH + strlen(_test_case_name);
+    int written_length = fprintf(_test_xml_file, format, _test_case_name, _test_case_time.tv_sec, _test_case_time.tv_nsec);
+    fprintf(_test_xml_file, "%*s\n", maximum_length-written_length, "");
 }
 
-void _test_report_case_format_close() {
-    fprintf(_test_report.file, "        </testcase>\n");
+void _test_xml_case_format_close() {
+    fprintf(_test_xml_file, "        </testcase>\n");
 }
 
-void _test_report_case_update() {
-    fseek(_test_report.file, _test_report.case_open, 0);
-    _test_report_case_format_open();
-    if(_test_case.error) _test_report_case_format_error();
-    if(_test_case.failed) _test_report_case_format_failure();
+void _test_xml_case_update() {
+    fseek(_test_xml_file, _test_xml_case_open_position, 0);
+    _test_xml_case_format_open();
+    if(_test_case_error) _test_xml_case_format_error();
+    if(_test_case_failed) _test_xml_case_format_failure();
 }
 
-void _test_report_update() {
-    _test_report_run_update();
-    _test_report_suite_update();
-    _test_report_case_update();
-    _test_report.case_close = ftell(_test_report.file);
-    _test_report_case_format_close();
-    _test_report.suite_close = ftell(_test_report.file);
-    _test_report_suite_format_close();
-    _test_report.run_close = ftell(_test_report.file);
-    _test_report_run_format_close();
+void _test_xml_update() {
+    _test_xml_run_update();
+    _test_xml_suite_update();
+    _test_xml_case_update();
+    _test_xml_case_close_position = ftell(_test_xml_file);
+    _test_xml_case_format_close();
+    _test_xml_suite_close_position = ftell(_test_xml_file);
+    _test_xml_suite_format_close();
+    _test_xml_run_close_position = ftell(_test_xml_file);
+    _test_xml_run_format_close();
+    fflush(_test_xml_file);
 }
 
-void _test_report_case_open() {
-    _test_report.case_open = _test_report.suite_close;
-    _test_report_update();
+void _test_xml_case_open() {
+    _test_xml_case_open_position = _test_xml_suite_close_position;
+    _test_xml_update();
 }
 
-void _test_report_case_close() {
-    _test_report_update();
+void _test_xml_case_close() {
+    _test_xml_update();
 }
-
-// PRINT
 
 void _test_print_assert_fail() {
-    if(_test_case.when == NULL) {
-        const char * format = "[\033[1;31mFAIL\033[0m] %s:%s:%s %s:%d: %s %s\033[0m\n";    
-        fprintf(stderr, format, _test_run.name, _test_suite.name, _test_case.name, _test_file_name(_test_assertion.file), _test_assertion.line, _test_assertion.name, _test_assertion.message);
-    } else if(_test_case.then == NULL) {
-        const char * format = "[\033[1;31mFAIL\033[0m] %s:%s:%s %s:%d: when %s: %s %s\033[0m\n";
-        fprintf(stderr, format, _test_run.name, _test_suite.name, _test_case.name, _test_file_name(_test_assertion.file), _test_assertion.line, _test_case.when, _test_assertion.name, _test_assertion.message);
-    } else {
-        const char * format = "[\033[1;31mFAIL\033[0m] %s:%s:%s %s:%d: when %s then %s: %s %s\033[0m\n";
-        fprintf(stderr, format, _test_run.name, _test_suite.name, _test_case.name, _test_file_name(_test_assertion.file), _test_assertion.line, _test_case.when, _test_case.then, _test_assertion.name, _test_assertion.message);
-    }
+    const char * format = "[\033[1;31mFAIL\033[0m] %s:%s %s:%d: %s %s\033[0m\n";    
+    fprintf(stderr, format, _test_suite_name, _test_case_name, _test_file_name(_test_assert_file), _test_assert_line, _test_assert_name, _test_assert_message);
 }
 
 void _test_print_case_open() {
-    fprintf(stderr, "[\033[1;97mTEST\033[0m] %s:%s:%s\n", _test_run.name, _test_suite.name, _test_case.name);
+    fprintf(stderr, "[\033[1;97mTEST\033[0m] %s:%s\n", _test_suite_name, _test_case_name);
 }
 
 void _test_print_case_pass() {
-    const char * format = "[\033[1;32mPASS\033[0m] %s:%s:%s (%fs)\n";
-    fprintf(stderr, format, _test_run.name, _test_suite.name, _test_case.name, _test_time_double(_test_case.time));
+    const char * format = "[\033[1;32mPASS\033[0m] %s:%s (%fs)\n";
+    fprintf(stderr, format, _test_suite_name, _test_case_name, _test_time_double(_test_case_time));
 }
 
 void _test_print_case_fail() {
-    const char * format = "[\033[1;31mFAIL\033[0m] %s:%s:%s (%ld.%09lds)\033[0m\n";
-    fprintf(stderr, format, _test_run.name, _test_suite.name, _test_case.name, _test_case.time.tv_sec, _test_case.time.tv_nsec);
-}
-
-void _test_print_run_close() {
-    const char * format = "[\033[1m====\033[0m] tested: \033[1;95m%d\033[0m passed: \033[1;32m%d\033[0m failed: \033[1;31m%d\033[0m\n";
-    fprintf(stderr, format, _test_run.tests, _test_run.tests - _test_run.failures, _test_run.failures);
+    const char * format = "[\033[1;31mFAIL\033[0m] %s:%s (%ld.%09lds)\033[0m\n";
+    fprintf(stderr, format, _test_suite_name, _test_case_name, _test_case_time.tv_sec, _test_case_time.tv_nsec);
 }
 
 void _test_print_case_close() {
-    if(!_test_case.failed) {
+    if(!_test_case_failed) {
         _test_print_case_pass();
     } else {
         // _test_print_case_fail();
     }
 }
 
-// CUSTOMIZATION
+void _test_print_run_close() {
+    const char * format = "[\033[1m====\033[0m] tested: \033[1;95m%d\033[0m passed: \033[1;32m%d\033[0m failed: \033[1;31m%d\033[0m\n";
+    fprintf(stderr, format, _test_run_tests, _test_run_tests - _test_run_failures, _test_run_failures);
+}
 
-#define _TEST_CASE_OPEN _test_report_case_open(); _test_print_case_open();
-#define _TEST_CASE_CLOSE _test_report_case_close(); _test_print_case_close();
-#define _TEST_SUITE_OPEN _test_report_suite_open();
-#define _TEST_SUITE_CLOSE _test_report_suite_close();
-#define _TEST_RUN_OPEN _test_report_open(); _test_report_run_open();
-#define _TEST_RUN_CLOSE _test_report_run_close(); _test_report_close(); _test_print_run_close();
+// RUNNER
+
+int _test_new_suite(const char * name) {
+    if(_test_suite_name == NULL || name == NULL) return 1; 
+    return strcmp(_test_suite_name, name) != 0;
+}
+
+int _test_new_run() {
+    return _test_run_timestamp.tv_sec == 0 && _test_run_timestamp.tv_nsec == 0;
+}
+
+#define _TEST_RUN_OPEN _test_xml_open(); _test_xml_run_open();
+#define _TEST_RUN_CLOSE _test_xml_run_close(); _test_xml_close(); _test_print_run_close();
+
+#define _TEST_SUITE_OPEN _test_xml_suite_open();
+#define _TEST_SUITE_CLOSE _test_xml_suite_close();
+
+#define _TEST_CASE_OPEN _test_xml_case_open(); _test_print_case_open();
+#define _TEST_CASE_CLOSE _test_xml_case_close(); _test_print_case_close();
+
 #define _TEST_ASSERT_PASS 
 #define _TEST_ASSERT_FAIL _test_print_assert_fail();
 
-void _test_case_(const char * name, void(*function)()) {
-    _test_case.name = name; 
-    _test_case.timestamp = _test_time_now(); 
-    _test_case.time = _test_time_zero();
-    _test_case.scenario_index = 0;
-    _test_case.error = 1;
-    _test_case.failed = 0; 
-    _test_case.passed = 0;
+void _test_atexit() {
+    _TEST_RUN_CLOSE
+}
 
-    _test_suite.tests += 1;
-    _test_suite.errors += 1;
+void _test_case(const char * suite_name, const char * case_name, void (*function)()) {
+    if(_test_new_run()) {
+        _test_run_timestamp = _test_time_now();
+        _test_run_time = _test_time_zero();
+        _test_run_failures = 0;
+        _test_run_errors = 0;
+        _test_run_tests = 0;
+        _TEST_RUN_OPEN
+        atexit(_test_atexit);
+    }
 
-    _test_run.tests += 1;
-    _test_run.errors += 1;
+    if(_test_new_suite(suite_name)) {
+        if(_test_suite_name != NULL) {
+            _TEST_SUITE_CLOSE
+        }
+
+        _test_suite_name = suite_name;
+        _test_suite_timestamp = _test_time_now(); 
+        _test_suite_time = _test_time_zero();
+        _test_suite_failures = 0;
+        _test_suite_errors = 0;
+        _test_suite_tests = 0;
+        _TEST_SUITE_OPEN
+    }
+
+    _test_case_name = case_name;
+    _test_case_timestamp = _test_time_now(); 
+    _test_case_time = _test_time_zero();
+    _test_case_error = 0;
+    _test_case_failed = 0;
+    _test_case_passed = 0;
+
+    // register test in suite and run
+    _test_suite_tests += 1;
+    _test_run_tests += 1;
+
+    // until the test finishes, we assume an error happened
+    _test_case_error += 1;
+    _test_suite_errors += 1;
+    _test_run_errors += 1;
 
     _TEST_CASE_OPEN
 
-    do {
-        _test_case.when = 0;
-        _test_case.then = 0;
-        _test_case.when_index = 0;
-        function();
-        _test_case.scenario_index += 1;
-    } while(_test_case.scenario_index < _test_case.when_index);
+    function();
 
-    _test_case.error = 0;
-    _test_case.time = _test_time_sub(_test_time_now(), _test_case.timestamp);
+    // when the test finishes, no error occured
+    _test_case_error -= 1;
+    _test_suite_errors -= 1;
+    _test_run_errors -= 1;
 
-    _test_suite.time = _test_time_add(_test_suite.time, _test_case.time);
-    _test_suite.errors -= 1;
-    _test_suite.failures += _test_case.failed > 0 ? 1 : 0;
+    // register outcome in suite and run
+    _test_suite_failures += _test_case_failed > 0 ? 1 : 0;
+    _test_run_failures += _test_case_failed > 0 ? 1 : 0;
 
-    _test_run.time = _test_time_add(_test_run.time, _test_case.time);
-    _test_run.errors -= 1;
-    _test_run.failures += _test_case.failed > 0 ? 1 : 0;
+    // update time tracking
+    _test_case_time = _test_time_sub(_test_time_now(), _test_case_timestamp);
+    _test_suite_time = _test_time_add(_test_suite_time, _test_case_time);
+    _test_run_time = _test_time_add(_test_run_time, _test_case_time);
 
     _TEST_CASE_CLOSE
 }
 
-void _test_suite_(const char * name, void(*function)()) {
-    _test_suite.name = name; 
-    _test_suite.timestamp = _test_time_now(); 
-    _test_suite.time = _test_time_zero();
-    _test_suite.failures = 0;
-    _test_suite.errors = 0;
-    _test_suite.tests = 0;
-
-    _TEST_SUITE_OPEN
-    function();
-    _TEST_SUITE_CLOSE
-}
-
-int _test_run_(int argc, char ** argv, const char * name, void (*function)()) {
-    _TEST_UNUSED(argc);
-    _TEST_UNUSED(argv);
-    _test_run.name = name;
-    _test_run.timestamp = _test_time_now();
-    _test_run.time = _test_time_zero();
-    _test_run.failures = 0;
-    _test_run.errors = 0;
-    _test_run.tests = 0;
-
-    _TEST_RUN_OPEN
-    function();
-    _TEST_RUN_CLOSE
-
-    return 0;
-}
-
-int _test_assert(int result) {
+// REWORK THIS START !!!! 
+int _test_assert_evaluate(int result) {
     if(result) {
-        _test_case.passed += 1;
+        _test_case_passed += 1;
         _TEST_ASSERT_PASS
         return 0;
     } else {
-        _test_case.failed += 1;
+        _test_case_failed += 1;
         _TEST_ASSERT_FAIL
         return 1;
     }
 }
 
-#define _TEST_ASSERT(_name, _file, _line, _expression, ...) \
-    _test_assertion.name = _name; \
-    _test_assertion.file = _file; \
-    _test_assertion.line = _line;  \
-    _test_assertion.expression = #_expression; \
-    snprintf(_test_assertion.message, sizeof(_test_assertion.message), __VA_ARGS__); \
-    if(_test_assert(_expression)) return;
+#define _test_assert_update(_name, _file, _line, _expression, ...) \
+    _test_assert_name = _name; \
+    _test_assert_file = _file; \
+    _test_assert_line = _line; \
+    _test_assert_expression = #_expression; \
+    snprintf(_test_assert_message, sizeof(_test_assert_message), __VA_ARGS__);
 
-#define _TEST_EXPECT(_name, _file, _line, _expression, ...) \
-    _test_assertion.name = _name; \
-    _test_assertion.file = _file; \
-    _test_assertion.line = _line;  \
-    _test_assertion.expression = #_expression; \
-    snprintf(_test_assertion.message, sizeof(_test_assertion.message), __VA_ARGS__); \
-    _test_assert(_expression);
+#define _test_assert(_name, _file, _line, _expression, ...) \
+    _test_assert_update(_name, _file, _line, _expression, __VA_ARGS__) \
+    if(_test_assert_evaluate(_expression)) return;
 
-#define TEST_RUN(argc, argv, function) _test_run_(argc, argv, #function, function);
-#define TEST_SUITE(function) _test_suite_(#function, function)
-#define TEST_CASE(function) _test_case_(#function, function)
-#define TEST_SCENARIO(function) TEST_CASE(function)
-#define TEST_WHEN(message) \
-    _test_case.when = message; \
-    if(_test_case.scenario_index == _test_case.when_index++)
-#define TEST_THEN(message) \
-    _test_case.then = message;  
+#define _test_expect(_name, _file, _line, _expression, ...) \
+    _test_assert_update(_name, _file, _line, _expression, __VA_ARGS__) \
+    _test_assert_evaluate(_expression);
 
-// ASSERTIONS
+#define test_case(function) _test_case(__func__, #function, function)
 
-#define TEST_ASSERT_MESSAGE(expression, ...) _TEST_ASSERT("assert", __FILE__, __LINE__, expression, __VA_ARGS__)
-#define TEST_EXPECT_MESSAGE(expression, ...) _TEST_EXPECT("expect", __FILE__, __LINE__, expression, __VA_ARGS__)
-#define TEST_ASSERT(expression) TEST_ASSERT_MESSAGE(expression, #expression" (%d)", expression)
-#define TEST_EXPECT(expression) TEST_EXPECT_MESSAGE(expression, #expression" (%d)", expression)
+// ASSERTIONS 
 
-#define TEST_ASSERT_EQ_MESSAGE(a, b, ...) TEST_ASSERT_MESSAGE(a == b, __VA_ARGS__)
-#define TEST_ASSERT_NE_MESSAGE(a, b, ...) TEST_ASSERT_MESSAGE(a != b, __VA_ARGS__)
-#define TEST_ASSERT_GT_MESSAGE(a, b, ...) TEST_ASSERT_MESSAGE(a > b, __VA_ARGS__)
-#define TEST_ASSERT_GE_MESSAGE(a, b, ...) TEST_ASSERT_MESSAGE(a >= b, __VA_ARGS__)
-#define TEST_ASSERT_LT_MESSAGE(a, b, ...) TEST_ASSERT_MESSAGE(a < b, __VA_ARGS__)
-#define TEST_ASSERT_LE_MESSAGE(a, b, ...) TEST_ASSERT_MESSAGE(a <= b, __VA_ARGS__)
+#define test_assert_message(expression, ...) _test_assert("assert", __FILE__, __LINE__, expression, __VA_ARGS__)
+#define test_expect_message(expression, ...) _test_expect("expect", __FILE__, __LINE__, expression, __VA_ARGS__)
+#define test_assert(expression) test_assert_message(expression, #expression" (%d)", expression)
+#define test_expect(expression) test_expect_message(expression, #expression" (%d)", expression)
 
-#define TEST_ASSERT_OP_TYPE(a, op, b, format) TEST_ASSERT_MESSAGE(a op b, #a" "#op" "#b" ("format" "#op" "format")", a, b)
+#define test_assert_eq_message(a, b, ...) test_assert_message(a == b, __VA_ARGS__)
+#define test_assert_ne_message(a, b, ...) test_assert_message(a != b, __VA_ARGS__)
+#define test_assert_gt_message(a, b, ...) test_assert_message(a > b, __VA_ARGS__)
+#define test_assert_ge_message(a, b, ...) test_assert_message(a >= b, __VA_ARGS__)
+#define test_assert_lt_message(a, b, ...) test_assert_message(a < b, __VA_ARGS__)
+#define test_assert_le_message(a, b, ...) test_assert_message(a <= b, __VA_ARGS__)
 
-#define TEST_ASSERT_EQ_INT(a, b) TEST_ASSERT_OP_TYPE(a, ==, b, "%d")
-#define TEST_ASSERT_NE_INT(a, b) TEST_ASSERT_OP_TYPE(a, !=, b, "%d")
-#define TEST_ASSERT_GE_INT(a, b) TEST_ASSERT_OP_TYPE(a, >=, b, "%d")
-#define TEST_ASSERT_LE_INT(a, b) TEST_ASSERT_OP_TYPE(a, <=, b, "%d")
-#define TEST_ASSERT_GT_INT(a, b) TEST_ASSERT_OP_TYPE(a, >, b, "%d")
-#define TEST_ASSERT_LT_INT(a, b) TEST_ASSERT_OP_TYPE(a, <, b, "%d")
+#define test_assert_op_type(a, op, b, format) test_assert_message(a op b, #a" "#op" "#b" ("format" "#op" "format")", a, b)
 
-#define TEST_ASSERT_EQ_UINT(a, b) TEST_ASSERT_OP_TYPE(a, ==, b, "%u")
-#define TEST_ASSERT_NE_UINT(a, b) TEST_ASSERT_OP_TYPE(a, !=, b, "%u")
-#define TEST_ASSERT_GE_UINT(a, b) TEST_ASSERT_OP_TYPE(a, >=, b, "%u")
-#define TEST_ASSERT_LE_UINT(a, b) TEST_ASSERT_OP_TYPE(a, <=, b, "%u")
-#define TEST_ASSERT_GT_UINT(a, b) TEST_ASSERT_OP_TYPE(a, >,  b, "%u")
-#define TEST_ASSERT_LT_UINT(a, b) TEST_ASSERT_OP_TYPE(a, <,  b, "%u")
+#define test_assert_eq_int(a, b) test_assert_op_type(a, ==, b, "%d")
+#define test_assert_ne_int(a, b) test_assert_op_type(a, !=, b, "%d")
+#define test_assert_ge_int(a, b) test_assert_op_type(a, >=, b, "%d")
+#define test_assert_le_int(a, b) test_assert_op_type(a, <=, b, "%d")
+#define test_assert_gt_int(a, b) test_assert_op_type(a, >, b, "%d")
+#define test_assert_lt_int(a, b) test_assert_op_type(a, <, b, "%d")
 
-#define TEST_ASSERT_EQ_FLOAT(a, b) TEST_ASSERT_OP_TYPE(a, ==, b, "%f")
-#define TEST_ASSERT_NE_FLOAT(a, b) TEST_ASSERT_OP_TYPE(a, !=, b, "%f")
-#define TEST_ASSERT_GE_FLOAT(a, b) TEST_ASSERT_OP_TYPE(a, >=, b, "%f")
-#define TEST_ASSERT_LE_FLOAT(a, b) TEST_ASSERT_OP_TYPE(a, <=, b, "%f")
-#define TEST_ASSERT_GT_FLOAT(a, b) TEST_ASSERT_OP_TYPE(a, >,  b, "%f")
-#define TEST_ASSERT_LT_FLOAT(a, b) TEST_ASSERT_OP_TYPE(a, <,  b, "%f")
+#define test_assert_eq_uint(a, b) test_assert_op_type(a, ==, b, "%u")
+#define test_assert_ne_uint(a, b) test_assert_op_type(a, !=, b, "%u")
+#define test_assert_ge_uint(a, b) test_assert_op_type(a, >=, b, "%u")
+#define test_assert_le_uint(a, b) test_assert_op_type(a, <=, b, "%u")
+#define test_assert_gt_uint(a, b) test_assert_op_type(a, >,  b, "%u")
+#define test_assert_lt_uint(a, b) test_assert_op_type(a, <,  b, "%u")
 
-#define TEST_ASSERT_EQ_HEX(a, b) TEST_ASSERT_OP_TYPE(a, ==, b, "%x")
-#define TEST_ASSERT_NE_HEX(a, b) TEST_ASSERT_OP_TYPE(a, !=, b, "%x")
-#define TEST_ASSERT_GE_HEX(a, b) TEST_ASSERT_OP_TYPE(a, >=, b, "%x")
-#define TEST_ASSERT_LE_HEX(a, b) TEST_ASSERT_OP_TYPE(a, <=, b, "%x")
-#define TEST_ASSERT_GT_HEX(a, b) TEST_ASSERT_OP_TYPE(a, >,  b, "%x")
-#define TEST_ASSERT_LT_HEX(a, b) TEST_ASSERT_OP_TYPE(a, <,  b, "%x")
+#define test_assert_eq_float(a, b) test_assert_op_type(a, ==, b, "%f")
+#define test_assert_ne_float(a, b) test_assert_op_type(a, !=, b, "%f")
+#define test_assert_ge_float(a, b) test_assert_op_type(a, >=, b, "%f")
+#define test_assert_le_float(a, b) test_assert_op_type(a, <=, b, "%f")
+#define test_assert_gt_float(a, b) test_assert_op_type(a, >,  b, "%f")
+#define test_assert_lt_float(a, b) test_assert_op_type(a, <,  b, "%f")
 
-#define TEST_ASSERT_EQ_CHAR(a, b) TEST_ASSERT_OP_TYPE(a, ==, b, "%c")
-#define TEST_ASSERT_NE_CHAR(a, b) TEST_ASSERT_OP_TYPE(a, !=, b, "%c")
-#define TEST_ASSERT_GT_CHAR(a, b) TEST_ASSERT_OP_TYPE(a, >=, b, "%c")
-#define TEST_ASSERT_GE_CHAR(a, b) TEST_ASSERT_OP_TYPE(a, <=, b, "%c")
-#define TEST_ASSERT_LT_CHAR(a, b) TEST_ASSERT_OP_TYPE(a, >,  b, "%c")
-#define TEST_ASSERT_LE_CHAR(a, b) TEST_ASSERT_OP_TYPE(a, <,  b, "%c")
+#define test_assert_eq_hex(a, b) test_assert_op_type(a, ==, b, "%x")
+#define test_assert_ne_hex(a, b) test_assert_op_type(a, !=, b, "%x")
+#define test_assert_ge_hex(a, b) test_assert_op_type(a, >=, b, "%x")
+#define test_assert_le_hex(a, b) test_assert_op_type(a, <=, b, "%x")
+#define test_assert_gt_hex(a, b) test_assert_op_type(a, >,  b, "%x")
+#define test_assert_lt_hex(a, b) test_assert_op_type(a, <,  b, "%x")
 
-#define TEST_ASSERT_ALL_NE_INT(array, size, expected) 
+#define test_assert_eq_char(a, b) test_assert_op_type(a, ==, b, "%c")
+#define test_assert_ne_char(a, b) test_assert_op_type(a, !=, b, "%c")
+#define test_assert_gt_char(a, b) test_assert_op_type(a, >=, b, "%c")
+#define test_assert_ge_char(a, b) test_assert_op_type(a, <=, b, "%c")
+#define test_assert_lt_char(a, b) test_assert_op_type(a, >,  b, "%c")
+#define test_assert_le_char(a, b) test_assert_op_type(a, <,  b, "%c")
 
+#define test_assert_eq_string(a, b) test_assert_message(strcmp(a, b) == 0, "\"%s\" == \"%s\"", a, b)
+#define test_assert_ne_string(a, b) test_assert_message(strcmp(a, b) != 0, "\"%s\" != \"%s\"", a, b)
 
-#define TEST_ASSERT_EQ_STRING(a, b) TEST_ASSERT_MESSAGE(strcmp(a, b) == 0, "\"%s\" == \"%s\"", a, b)
-#define TEST_ASSERT_NE_STRING(a, b) TEST_ASSERT_MESSAGE(strcmp(a, b) != 0, "\"%s\" != \"%s\"", a, b)
-
-#define TEST_ASSERT_EQ_BYTES(a, b, size) TEST_ASSERT_MESSAGE(memcmp(a, b) == 0, "\"%s\" == \"%s\"", a, b)
-#define TEST_ASSERT_NE_BYTES(a, b, size) TEST_ASSERT_MESSAGE(strcmp(a, b) == 0, "\"%s\" == \"%s\"", a, b)
+#define test_assert_eq_bytes(a, b, size) test_assert_message(memcmp(a, b) == 0, "\"%s\" == \"%s\"", a, b)
+#define test_assert_ne_bytes(a, b, size) test_assert_message(strcmp(a, b) == 0, "\"%s\" == \"%s\"", a, b)
 
 #endif /* STATIC_TEST_H */
