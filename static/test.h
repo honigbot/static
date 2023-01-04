@@ -374,7 +374,6 @@ void _test_case(const char * suite_name, const char * case_name, void (*function
     _TEST_CASE_CLOSE
 }
 
-// REWORK THIS START !!!! 
 int _test_assert_evaluate(int result) {
     if(result) {
         _test_case_passed += 1;
