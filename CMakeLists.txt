@@ -12,11 +12,14 @@ add_executable(test_log_custom tests/log_custom.c)
 target_link_libraries(test_log_custom PUBLIC static)
 target_compile_options(test_log_custom PUBLIC -std=gnu99 -Wall -Wextra -pedantic)
 
+add_executable(test_log_syslog tests/log_syslog.c)
+target_link_libraries(test_log_syslog PUBLIC static)
+target_compile_options(test_log_syslog PUBLIC -std=gnu99 -Wall -Wextra -pedantic)
+
+add_executable(test_log_oslog tests/log_oslog.c)
+target_link_libraries(test_log_oslog PUBLIC static)
+target_compile_options(test_log_oslog PUBLIC -std=gnu99 -Wall -Wextra -pedantic)
+
 add_executable(test_test tests/test_test.c)
 target_link_libraries(test_test PUBLIC static)
 target_compile_options(test_test PUBLIC -std=gnu99 -Wall -Wextra -pedantic)
-
-add_executable(test_gherkin tests/test_gherkin.c)
-target_link_libraries(test_gherkin PUBLIC static)
-target_compile_options(test_gherkin PUBLIC -std=gnu99 -Wall -Wextra -pedantic)
-
